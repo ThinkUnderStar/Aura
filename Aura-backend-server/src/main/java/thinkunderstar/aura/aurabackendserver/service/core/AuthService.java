@@ -1,21 +1,11 @@
-package thinkunderstar.aura.aurabackendserver.controller;
+package thinkunderstar.aura.aurabackendserver.service.core;
 
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.RequestBody;
 import thinkunderstar.aura.aurabackendserver.common.Result;
 import thinkunderstar.aura.aurabackendserver.dto.request.LoginDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.RegisterDto;
-import thinkunderstar.aura.aurabackendserver.service.core.AuthService;
 
-@RestController
-@RequestMapping("/auth")
-public class AuthController {
-
-    private final AuthService authService;
-
-    public AuthController(AuthService authService) {
-        this.authService = authService;
-    }
-
+public interface AuthService {
     /**
      * 用户密码登录
      * <p>
@@ -25,10 +15,7 @@ public class AuthController {
      * @param loginDto 登录请求参数，包含账号和密码
      * @return Result 登录结果，成功时返回用户信息及Token
      */
-    @PostMapping("/login")
-    public Result login(@RequestBody LoginDto loginDto){
-        return authService.login(loginDto);
-    }
+    Result login(LoginDto loginDto);
 
     /**
      * 发送登录验证码
@@ -39,10 +26,7 @@ public class AuthController {
      * @param username 手机号或邮箱地址（根据格式自动识别）
      * @return Result 发送结果，成功时返回"验证码已发送"，失败时返回错误信息
      */
-    @PostMapping("/code")
-    public Result sendCode(@RequestParam String username,@RequestParam String way){
-        return authService.sendCode(username,way);
-    }
+    Result sendCode(String username,String way);
 
     /**
      * 用户注册
@@ -53,10 +37,7 @@ public class AuthController {
      * @param registerDto 注册请求参数，包含用户名、密码、确认密码、手机号、验证码
      * @return Result 注册结果，成功时返回用户信息及Token，失败时返回错误信息
      */
-    @PostMapping("/register/user")
-    public Result registerUser(@RequestBody RegisterDto registerDto){
-        return authService.registerUser(registerDto);
-    }
-
-
+    Result registerUser(RegisterDto registerDto);
 }
+
+

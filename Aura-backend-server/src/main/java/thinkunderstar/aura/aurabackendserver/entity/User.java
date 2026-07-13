@@ -18,9 +18,36 @@ public class User {
     private String avatar;
 
     /**
+     * 1-普通用户 2-管理员
+     */
+    private Integer role;
+
+    /**
      * 1-正常 0-禁用
      */
     private Integer status;
+
+    // ==================== 封禁相关字段 ====================
+
+    /**
+     * 封禁开始时间
+     */
+    private LocalDateTime banStartTime;
+
+    /**
+     * 封禁结束时间（null表示永久封禁）
+     */
+    private LocalDateTime banEndTime;
+
+    /**
+     * 封禁原因
+     */
+    private String banReason;
+
+    /**
+     * 执行封禁操作的管理员ID
+     */
+    private Long banBy;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
@@ -28,7 +55,9 @@ public class User {
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
 
-    @TableLogic
+    /**
+     * 0为正常，1为被删除
+     */
     private Integer deleted;
 
     public User() {}
