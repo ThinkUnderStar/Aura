@@ -1,9 +1,11 @@
 package thinkunderstar.aura.aurabackendserver.service.core;
 
-import org.springframework.web.bind.annotation.RequestBody;
 import thinkunderstar.aura.aurabackendserver.common.Result;
 import thinkunderstar.aura.aurabackendserver.dto.request.LoginDto;
-import thinkunderstar.aura.aurabackendserver.dto.request.RegisterDto;
+import thinkunderstar.aura.aurabackendserver.dto.request.RegisterAdminDto;
+import thinkunderstar.aura.aurabackendserver.dto.request.RegisterUserDto;
+import thinkunderstar.aura.aurabackendserver.dto.response.UserVODto;
+import thinkunderstar.aura.aurabackendserver.entity.User;
 
 public interface AuthService {
     /**
@@ -15,7 +17,7 @@ public interface AuthService {
      * @param loginDto 登录请求参数，包含账号和密码
      * @return Result 登录结果，成功时返回用户信息及Token
      */
-    Result login(LoginDto loginDto);
+    Result<UserVODto> login(LoginDto loginDto);
 
     /**
      * 发送登录验证码
@@ -26,7 +28,7 @@ public interface AuthService {
      * @param username 手机号或邮箱地址（根据格式自动识别）
      * @return Result 发送结果，成功时返回"验证码已发送"，失败时返回错误信息
      */
-    Result sendCode(String username,String way);
+    Result<Void> sendCode(String username,String way);
 
     /**
      * 用户注册
@@ -37,7 +39,38 @@ public interface AuthService {
      * @param registerDto 注册请求参数，包含用户名、密码、确认密码、手机号、验证码
      * @return Result 注册结果，成功时返回用户信息及Token，失败时返回错误信息
      */
-    Result registerUser(RegisterDto registerDto);
+    Result<Void> registerUser(RegisterUserDto registerDto);
+
+    /**
+     * 注销账户
+     * <p>
+     * 永久注销当前登录账户，执行软删除（deleted=1），
+     * 注销后该账号无法登录，但历史数据保留。
+     * 前端需在调用前二次确认用户意愿。
+     *
+     * @return Result 注销结果
+     */
+    Result<Void> delete();
+
+    /**
+     * 彻底删除之前软删除的账户
+     *
+     * @param user 之前被软删除的账户对象
+     */
+    void deleteUserAccount(User user);
+
+    /**
+     * 管理员注册接口
+     * <p>
+     * 用于创建新的管理员账号，仅限已有管理员权限的用户调用。
+     * 注册时需提供用户名、密码、手机号、邮箱及验证码。
+     * 创建成功后可直接登录，无需再次激活。
+     * 管理员账号默认拥有系统管理权限。
+     *
+     * @param registerDto 管理员注册参数，包含用户名、密码、确认密码、手机号、邮箱、验证码
+     * @return Result 注册结果，成功时返回成功消息，失败时返回错误信息
+     */
+    Result<Void> registerAdmin(RegisterAdminDto registerDto);
 }
 
 

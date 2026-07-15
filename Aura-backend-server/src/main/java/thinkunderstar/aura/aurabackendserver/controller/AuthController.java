@@ -1,9 +1,14 @@
 package thinkunderstar.aura.aurabackendserver.controller;
 
+import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.annotation.SaCheckRole;
+import cn.dev33.satoken.stp.StpUtil;
 import org.springframework.web.bind.annotation.*;
 import thinkunderstar.aura.aurabackendserver.common.Result;
 import thinkunderstar.aura.aurabackendserver.dto.request.LoginDto;
-import thinkunderstar.aura.aurabackendserver.dto.request.RegisterDto;
+import thinkunderstar.aura.aurabackendserver.dto.request.RegisterAdminDto;
+import thinkunderstar.aura.aurabackendserver.dto.request.RegisterUserDto;
+import thinkunderstar.aura.aurabackendserver.dto.response.UserVODto;
 import thinkunderstar.aura.aurabackendserver.service.core.AuthService;
 
 @RestController
@@ -26,7 +31,7 @@ public class AuthController {
      * @return Result 登录结果，成功时返回用户信息及Token
      */
     @PostMapping("/login")
-    public Result login(@RequestBody LoginDto loginDto){
+    public Result<UserVODto> login(@RequestBody LoginDto loginDto){
         return authService.login(loginDto);
     }
 
@@ -40,7 +45,7 @@ public class AuthController {
      * @return Result 发送结果，成功时返回"验证码已发送"，失败时返回错误信息
      */
     @PostMapping("/code")
-    public Result sendCode(@RequestParam String username,@RequestParam String way){
+    public Result<Void> sendCode(@RequestParam String username,@RequestParam String way){
         return authService.sendCode(username,way);
     }
 
@@ -54,9 +59,55 @@ public class AuthController {
      * @return Result 注册结果，成功时返回用户信息及Token，失败时返回错误信息
      */
     @PostMapping("/register/user")
-    public Result registerUser(@RequestBody RegisterDto registerDto){
+    public Result<Void> registerUser(@RequestBody RegisterUserDto registerDto){
         return authService.registerUser(registerDto);
     }
 
+    /**
+     * 管理员注册接口
+     * <p>
+     * 用于创建新的管理员账号，仅限已有管理员权限的用户调用。
+     * 注册时需提供用户名、密码、手机号、邮箱及验证码。
+     * 创建成功后可直接登录，无需再次激活。
+     * 管理员账号默认拥有系统管理权限。
+     *
+     * @param registerDto 管理员注册参数，包含用户名、密码、确认密码、手机号、邮箱、验证码
+     * @return Result 注册结果，成功时返回成功消息，失败时返回错误信息
+     */
+    @PostMapping("/register/admin")
+    @SaCheckLogin
+    @SaCheckRole("admin")
+    public Result<Void> registerAdmin(@RequestBody RegisterAdminDto registerDto){
+        return authService.registerAdmin(registerDto);
+    }
 
+    /**
+     * 用户退登
+     * <p>
+     * 清除当前用户的登录状态，使Token失效。
+     * 调用后客户端需要清除本地存储的Token。
+     *
+     * @return Result 退登结果，成功返回 success
+     */
+    @DeleteMapping("/logout")
+    @SaCheckLogin
+    public Result<Void> logout(){
+        StpUtil.logout();
+        return Result.success();
+    }
+
+    /**
+     * 注销账户
+     * <p>
+     * 永久注销当前登录账户，执行软删除（deleted=1），
+     * 注销后该账号无法登录，但历史数据保留。
+     * 前端需在调用前二次确认用户意愿。
+     *
+     * @return Result 注销结果
+     */
+    @DeleteMapping("/delete")
+    @SaCheckLogin
+    public Result<Void> delete(){
+        return authService.delete();
+    }
 }

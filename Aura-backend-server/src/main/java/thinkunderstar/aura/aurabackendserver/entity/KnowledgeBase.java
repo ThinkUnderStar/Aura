@@ -11,7 +11,16 @@ public class KnowledgeBase {
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private Long workspaceId;
+    /**
+     * 创建者ID（用户ID）
+     */
+    private Long ownerId;
+
+    /**
+     * 1-团队知识库 0-个人知识库
+     */
+    private Integer isTeam;
+
     private String name;
     private String description;
     private Integer docCount;
@@ -29,8 +38,9 @@ public class KnowledgeBase {
 
     public KnowledgeBase() {}
 
-    public KnowledgeBase(Long workspaceId, String name, String description) {
-        this.workspaceId = workspaceId;
+    public KnowledgeBase(Long ownerId, Integer isTeam, String name, String description) {
+        this.ownerId = ownerId;
+        this.isTeam = isTeam;
         this.name = name;
         this.description = description;
         this.docCount = 0;
@@ -38,9 +48,9 @@ public class KnowledgeBase {
     }
 
     /**
-     * 获取 Milvus Collection 名称（自动生成）
+     * 获取 Milvus Collection 名称
      */
     public String getCollectionName() {
-        return "aura_kb_" + this.workspaceId;
+        return "aura_kb_" + this.id + (this.isTeam == 1 ? "_team" : "_personal");
     }
 }

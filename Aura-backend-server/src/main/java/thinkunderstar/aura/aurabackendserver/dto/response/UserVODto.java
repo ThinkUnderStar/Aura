@@ -5,8 +5,8 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-public class LoginDataDto {
-    public LoginDataDto(
+public class UserVODto {
+    public UserVODto(
             Long id,
             String username,
             String phone,

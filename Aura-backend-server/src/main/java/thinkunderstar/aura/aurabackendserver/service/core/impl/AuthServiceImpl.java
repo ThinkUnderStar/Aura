@@ -4,12 +4,15 @@ import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.crypto.digest.BCrypt;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import thinkunderstar.aura.aurabackendserver.common.Result;
 import thinkunderstar.aura.aurabackendserver.dto.request.LoginDto;
-import thinkunderstar.aura.aurabackendserver.dto.request.RegisterDto;
-import thinkunderstar.aura.aurabackendserver.dto.response.LoginDataDto;
+import thinkunderstar.aura.aurabackendserver.dto.request.RegisterAdminDto;
+import thinkunderstar.aura.aurabackendserver.dto.request.RegisterUserDto;
+import thinkunderstar.aura.aurabackendserver.dto.response.UserVODto;
 import thinkunderstar.aura.aurabackendserver.entity.User;
 import thinkunderstar.aura.aurabackendserver.exception.AuthException;
 import thinkunderstar.aura.aurabackendserver.exception.BusinessException;
@@ -17,9 +20,13 @@ import thinkunderstar.aura.aurabackendserver.service.core.AuthService;
 import thinkunderstar.aura.aurabackendserver.service.wrapper.UserService;
 import thinkunderstar.aura.aurabackendserver.util.*;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 
+@Slf4j
 @Service
 public class AuthServiceImpl implements AuthService {
     private final RedisTokenBucketLimiter redisTokenBucketLimiter;
@@ -40,7 +47,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public Result login(LoginDto loginDto) {
+    public Result<UserVODto> login(LoginDto loginDto) {
         // 1:密码登录，2:验证码登录
         if (loginDto.getLoginWay() == 1){
             return loginWithPassword(loginDto);
@@ -52,7 +59,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public Result sendCode(String username,String way) {
+    public Result<Void> sendCode(String username,String way) {
         if(!(way.equals("login") || way.equals("register") || way.equals("reset"))) {
             throw new AuthException("验证码用途有问题");
         }
@@ -89,7 +96,8 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public Result registerUser(RegisterDto registerDto) {
+    @Transactional(rollbackFor = Exception.class)
+    public Result<Void> registerUser( RegisterUserDto registerDto) {
         //格式验证
         if (registerDto.getUsername() == null || registerDto.getUsername().isEmpty()) {
             throw new AuthException("用户昵称不能为空");
@@ -127,7 +135,7 @@ public class AuthServiceImpl implements AuthService {
         User user = userService.getOne(new LambdaQueryWrapper<User>().eq(User::getPhone, registerDto.getPhone()));
 
         if (user != null && user.getDeleted() != 1) {
-            throw new AuthException("该手机号已被绑定");
+            throw new AuthException("该手机号已被其他账户绑定");
         }
 
         if (
@@ -141,7 +149,7 @@ public class AuthServiceImpl implements AuthService {
 
         //覆盖软删除且同手机号的用户对象
         if(user!=null){
-            userService.removeById(user.getId());
+            deleteUserAccount(user);
         }
 
         //注册成功清除验证码缓存
@@ -158,8 +166,21 @@ public class AuthServiceImpl implements AuthService {
         return Result.success();
     }
 
+    @Override
+    public Result<Void> delete() {
+        long loginId = StpUtil.getLoginIdAsLong();
+        StpUtil.logout();
+        User user = userService.getById(loginId);
+        if (user == null) {
+            return Result.success();
+        }
+        user.setDeleted(1);
+        userService.updateById(user);
+        return Result.success();
+    }
+
     //1:密码登录
-    private Result loginWithPassword(LoginDto loginDto) {
+    private Result<UserVODto> loginWithPassword(LoginDto loginDto) {
         User user = null;
         //1为手机号,2为邮箱地址
         int whichName = validateAndRateLimit(loginDto);
@@ -175,11 +196,10 @@ public class AuthServiceImpl implements AuthService {
         }
 
         return justifyBan(loginDto, user);
-
     }
 
     //2:验证码登录
-    private Result loginWithCode(LoginDto loginDto) {
+    private Result<UserVODto> loginWithCode(LoginDto loginDto) {
         User user = null;
         //1为手机号,2为邮箱地址
         int whichName = validateAndRateLimit(loginDto);
@@ -236,14 +256,14 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @NonNull
-    private Result justifyBan(LoginDto loginDto, User user) {
+    private Result<UserVODto> justifyBan(LoginDto loginDto, User user) {
         String phone = DesensitizeUtils.desensitizePhone(user.getPhone());
         String email = null;
         if (user.getEmail() != null) {
             email = DesensitizeUtils.desensitizeEmail(user.getEmail());
         }
 
-        LoginDataDto loginDataDto = new LoginDataDto(
+        UserVODto userVODto = new UserVODto(
                 user.getId(),
                 user.getUsername(),
                 phone,
@@ -259,26 +279,26 @@ public class AuthServiceImpl implements AuthService {
 
         //是否被封禁
         if (user.getStatus() == 0) {
-            if (LocalDateTime.now().isAfter(loginDataDto.getBanEndTime())) {
+            if (LocalDateTime.now().isAfter(userVODto.getBanEndTime())) {
                 unBanUser(user);
                 //登录
                 StpUtil.login(user.getId(), loginDto.isRemember());
 
-                loginDataDto.setStatus(1);
-                loginDataDto.setBanBy(null);
-                loginDataDto.setBanReason(null);
-                loginDataDto.setBanStartTime(null);
-                loginDataDto.setBanEndTime(null);
-                loginDataDto.setToken(StpUtil.getTokenValue());
+                userVODto.setStatus(1);
+                userVODto.setBanBy(null);
+                userVODto.setBanReason(null);
+                userVODto.setBanStartTime(null);
+                userVODto.setBanEndTime(null);
+                userVODto.setToken(StpUtil.getTokenValue());
 
-                return Result.success(loginDataDto);
+                return Result.success(userVODto);
             }
             //登陆失败,token为null
-            return Result.error(403,"账号已被封禁",loginDataDto);
+            return Result.error(403,"账号已被封禁", userVODto);
         } else {
             StpUtil.login(user.getId(), loginDto.isRemember());
-            loginDataDto.setToken(StpUtil.getTokenValue());
-            return Result.success(loginDataDto);
+            userVODto.setToken(StpUtil.getTokenValue());
+            return Result.success(userVODto);
         }
     }
 
@@ -292,4 +312,128 @@ public class AuthServiceImpl implements AuthService {
 
         userService.updateById(user);
     }
+
+    //彻底删除一个账号
+    @Override
+    public void deleteUserAccount(User user) {
+        //删除头像文件
+        if (!(user.getAvatar() == null || user.getAvatar().isEmpty())) {
+            String oldAvatar = "./docs"+user.getAvatar();
+            try {
+                Files.deleteIfExists(Path.of(oldAvatar));
+            } catch (IOException e) {
+                log.warn("旧用户:"+user.getId()+"头像文件删除失败");
+            }
+        }
+
+        userService.removeById(user.getId());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Result<Void> registerAdmin(RegisterAdminDto registerDto) {
+        //格式验证
+        if (registerDto.getUsername() == null || registerDto.getUsername().isEmpty()) {
+            throw new AuthException("管理员昵称不能为空");
+        }
+
+        if (!ValidateUtils.usernameValidate(registerDto.getUsername())) {
+            throw new AuthException("管理员昵称格式不符合规定");
+        }
+
+        if (registerDto.getPassword() == null || registerDto.getPassword().isEmpty()) {
+            throw new AuthException("管理员密码不能为空");
+        }
+
+        if (!ValidateUtils.passwordValidate(registerDto.getPassword())) {
+            throw new AuthException("管理员密码格式不符合规定");
+        }
+
+        if (registerDto.getPhone() == null || registerDto.getPhone().isEmpty()) {
+            throw new AuthException("手机号不能为空");
+        }
+
+        if (!ValidateUtils.phoneValidate(registerDto.getPhone())) {
+            throw new AuthException("管理员手机号不合规");
+        }
+
+        if (registerDto.getEmail() == null || registerDto.getEmail().isEmpty()) {
+            throw new AuthException("邮箱地址不能为空");
+        }
+
+        if (!ValidateUtils.emailValidate(registerDto.getEmail())) {
+            throw new AuthException("管理员邮箱地址不合规");
+        }
+
+        if (!registerDto.getPassword().equals(registerDto.getRepeatPassword())) {
+            throw new AuthException("两次输入的密码不一致");
+        }
+
+        boolean IpLimiter = redisTokenBucketLimiter.tryAcquireByIp(
+                IpUtils.getClientIp(httpServletRequest),
+                3,
+                1
+        );
+        if (!IpLimiter) {
+            throw new AuthException("注册过于繁忙，请稍后再试");
+        }
+
+        User userPhone = userService.getOne(new LambdaQueryWrapper<User>().eq(User::getPhone, registerDto.getPhone()));
+
+        if (userPhone != null && userPhone.getDeleted() != 1) {
+            throw new AuthException("该手机号已被其他账号绑定");
+        }
+
+        if (
+                !redisUtils.hasKey(registerDto.getPhone()+":aura:codeExistLock:register")
+                        ||
+                        !registerDto.getPhoneCode()
+                                .equals(redisUtils.get(registerDto.getPhone()+":aura:codeExistLock:register"))
+        ){
+            throw new AuthException("手机验证码有误");
+        }
+
+        //覆盖软删除且同手机号的用户对象
+        if(userPhone !=null){
+            deleteUserAccount(userPhone);
+        }
+
+        User userEmail = userService.getOne(new LambdaQueryWrapper<User>().eq(User::getEmail, registerDto.getEmail()));
+
+        if (userEmail != null && userEmail.getDeleted() != 1) {
+            throw new AuthException("该邮箱已被其他账号绑定");
+        }
+
+        if (
+                !redisUtils.hasKey(registerDto.getEmail()+":aura:codeExistLock:register")
+                        ||
+                        !registerDto.getEmailCode()
+                                .equals(redisUtils.get(registerDto.getEmail()+":aura:codeExistLock:register"))
+        ){
+            throw new AuthException("邮箱验证码有误");
+        }
+
+        //覆盖软删除且同邮箱的用户对象
+        if (userEmail !=null){
+            deleteUserAccount(userEmail);
+        }
+
+        //注册成功清除验证码缓存
+        redisUtils.delete(registerDto.getPhone()+":aura:codeExistLock:register");
+        redisUtils.delete(registerDto.getEmail()+":aura:codeExistLock:register");
+
+        User user = new User();
+        user.setUsername(registerDto.getUsername());
+        user.setPassword(BCrypt.hashpw(registerDto.getPassword(), BCrypt.gensalt(12)));
+        user.setEmail(registerDto.getEmail());
+        user.setPhone(registerDto.getPhone());
+        user.setRole(2);
+        user.setStatus(1);
+
+        userService.save(user);
+        return Result.success();
+    }
 }
+
+
+

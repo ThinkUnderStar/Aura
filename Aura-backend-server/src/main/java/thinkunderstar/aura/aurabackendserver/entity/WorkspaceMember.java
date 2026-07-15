@@ -15,7 +15,7 @@ public class WorkspaceMember {
     private Long userId;
 
     /**
-     * 1-管理员 2-普通成员
+     * 0-创建者 1-管理员 2-普通成员
      */
     private Integer role;
 

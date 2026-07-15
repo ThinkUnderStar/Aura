@@ -16,12 +16,12 @@ public class Workspace {
     private String logo;
     private String inviteCode;
 
-    /**
-     * 1-个人空间 2-团队
-     */
-    private Integer type;
-
     private Long ownerId;
+
+    /**
+     * 关联的知识库ID
+     */
+    private Long kbId;
 
     /**
      * 1-正常 0-已解散
@@ -36,19 +36,10 @@ public class Workspace {
 
     public Workspace() {}
 
-    public Workspace(String name, String description, Integer type, Long ownerId) {
+    public Workspace(String name, String description, Long ownerId) {
         this.name = name;
         this.description = description;
-        this.type = type;
         this.ownerId = ownerId;
         this.status = 1;
-    }
-
-    public boolean isPersonal() {
-        return type != null && type == 1;
-    }
-
-    public boolean isTeam() {
-        return type != null && type == 2;
     }
 }
