@@ -29,7 +29,7 @@ public class SysWorkspaceController {
      */
     @GetMapping("/get")
     @SaCheckLogin
-    public Result<IPage<WorkspaceVODto>>  getMyWorkspaces(
+    public Result<IPage<WorkspaceVODto>> getMyWorkspaces(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size
     ){

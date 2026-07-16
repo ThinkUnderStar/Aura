@@ -2,7 +2,7 @@ package thinkunderstar.aura.aurabackendserver.service.core;
 
 import org.springframework.web.multipart.MultipartFile;
 import thinkunderstar.aura.aurabackendserver.common.Result;
-import thinkunderstar.aura.aurabackendserver.dto.request.UpdateDto;
+import thinkunderstar.aura.aurabackendserver.dto.request.UpdateUserDto;
 
 public interface SysUserService {
     /**
@@ -12,10 +12,10 @@ public interface SysUserService {
      * 不支持修改密码（需使用 /password 接口）和头像（需使用 /avatar 接口）。
      * 更新成功后自动返回最新信息，部分字段（如手机号）有唯一性校验。
      *
-     * @param updateDto 更新请求参数
+     * @param updateUserDto 更新请求参数
      * @return Result 更新结果
      */
-    Result<Void> update(UpdateDto updateDto);
+    Result<Void> update(UpdateUserDto updateUserDto);
 
     /**
      * 上传头像

@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import thinkunderstar.aura.aurabackendserver.common.Result;
-import thinkunderstar.aura.aurabackendserver.dto.request.UpdateDto;
+import thinkunderstar.aura.aurabackendserver.dto.request.UpdateUserDto;
 import thinkunderstar.aura.aurabackendserver.entity.User;
 import thinkunderstar.aura.aurabackendserver.exception.AuthException;
 import thinkunderstar.aura.aurabackendserver.exception.BusinessException;
@@ -47,9 +47,9 @@ public class SysUserServiceImpl implements SysUserService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Result<Void> update(UpdateDto updateDto) {
+    public Result<Void> update(UpdateUserDto updateUserDto) {
         //type只包括“username”，“password”，“phone”，“email”
-        if (updateDto.getType() == null || updateDto.getType().isEmpty()) {
+        if (updateUserDto.getType() == null || updateUserDto.getType().isEmpty()) {
             throw new AuthException("修改用户信息的类型参数有问题");
         }
 
@@ -63,10 +63,10 @@ public class SysUserServiceImpl implements SysUserService {
             throw new AuthException("修改操作过于频繁，请稍后再试");
         }
 
-        switch (updateDto.getType()) {
+        switch (updateUserDto.getType()) {
             case "username" -> {
                 //修改用户昵称
-                if (updateUsername(updateDto.getUsername())) {
+                if (updateUsername(updateUserDto.getUsername())) {
                     return Result.success();
                 } else {
                     return Result.error("修改用户昵称失败");
@@ -75,7 +75,7 @@ public class SysUserServiceImpl implements SysUserService {
             }
             case "password" -> {
                 //修改用户密码
-                if (updatePassword(updateDto.getPassword(), updateDto.getRepeatPassword())) {
+                if (updatePassword(updateUserDto.getPassword(), updateUserDto.getRepeatPassword())) {
                     return Result.success();
                 } else {
                     return Result.error("修改用户密码失败");
@@ -84,7 +84,7 @@ public class SysUserServiceImpl implements SysUserService {
             }
             case "phone" -> {
                 //修改账号绑定的手机号
-                if (updatePhone(updateDto.getPhone(), updateDto.getCode())) {
+                if (updatePhone(updateUserDto.getPhone(), updateUserDto.getCode())) {
                     return Result.success();
                 } else {
                     return Result.error("换绑用户手机号失败");
@@ -93,7 +93,7 @@ public class SysUserServiceImpl implements SysUserService {
             }
             case "email" -> {
                 //修改账号绑定的邮箱地址
-                if (updateEmail(updateDto.getEmail(), updateDto.getCode())) {
+                if (updateEmail(updateUserDto.getEmail(), updateUserDto.getCode())) {
                     return Result.success();
                 } else {
                     return Result.error("修改用户邮箱地址失败");

@@ -3,7 +3,7 @@ package thinkunderstar.aura.aurabackendserver.dto.request;
 import lombok.Data;
 
 @Data
-public class UpdateDto {
+public class UpdateUserDto {
     private String username;
     private String password;
     private String repeatPassword;

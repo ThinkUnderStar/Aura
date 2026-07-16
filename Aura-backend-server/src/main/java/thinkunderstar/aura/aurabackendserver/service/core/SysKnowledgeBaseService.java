@@ -3,6 +3,7 @@ package thinkunderstar.aura.aurabackendserver.service.core;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import thinkunderstar.aura.aurabackendserver.common.Result;
 import thinkunderstar.aura.aurabackendserver.dto.request.CreateKnowledgeBaseDto;
+import thinkunderstar.aura.aurabackendserver.dto.request.UpdateKnowledgeBaseDto;
 import thinkunderstar.aura.aurabackendserver.entity.KnowledgeBase;
 
 public interface SysKnowledgeBaseService {
@@ -29,4 +30,51 @@ public interface SysKnowledgeBaseService {
      * @return Result 包含分页知识库数据的响应，每项包含知识库ID、名称、描述、类型、文档数量、状态、创建时间等
      */
     Result<Page<KnowledgeBase>> getMyKnowledgeBases(Integer page, Integer pageSize);
+
+    /**
+     * 更新当前用户的知识库信息
+     * <p>
+     * 支持更新知识库的名称和/或描述信息，只能更新当前登录用户创建的知识库。
+     * 已停用（status=0）的知识库不允许更新，需先调用恢复接口。
+     * 更新成功后，知识库的 updateTime 字段会自动刷新为当前时间。
+     * 如果更新名称，会校验当前用户下是否存在同名知识库（排除自身）。
+     * <p>
+     * <b>校验规则：</b>
+     * <ul>
+     *     <li>知识库必须存在</li>
+     *     <li>当前用户必须是知识库的创建者</li>
+     *     <li>知识库必须是正常状态（status=1）</li>
+     *     <li>名称不能与同用户下的其他正常知识库重复</li>
+     * </ul>
+     *
+     * @param updateKnowledgeBaseDto 更新请求体，包含知识库ID、名称和描述（至少传入一个字段）
+     * @return Result 更新后的知识库完整信息，包含最新的 updateTime
+     */
+    Result<KnowledgeBase> updateMyKnowledgeBase(UpdateKnowledgeBaseDto updateKnowledgeBaseDto);
+
+    /**
+     * 更新团队知识库信息
+     * <p>
+     * 用于更新团队知识库的名称或描述，调用用户必须是该团队的管理员（群主或管理员）。
+     * 只有正常状态（status=1）的知识库才允许更新，已停用的知识库需先恢复。
+     * 更新成功后 updateTime 会自动刷新为当前时间。
+     * <p>
+     * <b>权限要求：</b>
+     * <ul>
+     *     <li>用户必须登录</li>
+     *     <li>用户必须是该知识库所在团队的管理员或群主</li>
+     *     <li>知识库必须处于正常状态（status=1）</li>
+     * </ul>
+     * <p>
+     * <b>校验规则：</b>
+     * <ul>
+     *     <li>type 只能是 "name" 或 "description"</li>
+     *     <li>value 不能为空</li>
+     *     <li>知识库必须存在且未被删除</li>
+     * </ul>
+     *
+     * @param updateKnowledgeBaseDto 更新请求体，包含知识库ID、修改类型、新值
+     * @return Result 更新后的知识库完整信息
+     */
+    Result<KnowledgeBase> updateTeamKnowledgeBase(UpdateKnowledgeBaseDto updateKnowledgeBaseDto);
 }

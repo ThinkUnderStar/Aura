@@ -4,7 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckLogin;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import thinkunderstar.aura.aurabackendserver.common.Result;
-import thinkunderstar.aura.aurabackendserver.dto.request.UpdateDto;
+import thinkunderstar.aura.aurabackendserver.dto.request.UpdateUserDto;
 import thinkunderstar.aura.aurabackendserver.service.core.SysUserService;
 
 @RestController
@@ -23,13 +23,13 @@ public class SysUserController {
      * 不支持修改密码（需使用 /password 接口）和头像（需使用 /avatar 接口）。
      * 更新成功后自动返回最新信息，部分字段（如手机号）有唯一性校验。
      *
-     * @param updateDto 更新请求参数
+     * @param updateUserDto 更新请求参数
      * @return Result 更新结果
      */
     @PutMapping("/update")
     @SaCheckLogin
-    public Result<Void> update(@RequestBody UpdateDto updateDto){
-        return sysUserService.update(updateDto);
+    public Result<Void> update(@RequestBody UpdateUserDto updateUserDto){
+        return sysUserService.update(updateUserDto);
     }
 
     /**
