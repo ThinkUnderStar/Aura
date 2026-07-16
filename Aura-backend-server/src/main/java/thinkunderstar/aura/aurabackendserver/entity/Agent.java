@@ -15,10 +15,6 @@ public class Agent {
     private Long userId;
 
     private String name;
-    private String description;
-    private String systemPrompt;
-    private BigDecimal temperature;
-    private Integer maxTokens;
 
     /**
      * 1-活跃 0-已归档
@@ -33,11 +29,10 @@ public class Agent {
 
     public Agent() {}
 
-    public Agent(Long userId, String name) {
+    public Agent(Long id, Long userId, String name) {
+        this.id = id;
         this.userId = userId;
         this.name = name;
-        this.temperature = new BigDecimal("0.70");
-        this.maxTokens = 4096;
         this.status = 1;
     }
 }

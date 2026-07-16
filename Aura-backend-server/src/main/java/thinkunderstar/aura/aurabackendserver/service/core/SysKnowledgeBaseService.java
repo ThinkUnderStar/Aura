@@ -1,6 +1,7 @@
 package thinkunderstar.aura.aurabackendserver.service.core;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.springframework.web.bind.annotation.RequestParam;
 import thinkunderstar.aura.aurabackendserver.common.Result;
 import thinkunderstar.aura.aurabackendserver.dto.request.CreateKnowledgeBaseDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.UpdateKnowledgeBaseDto;
@@ -77,4 +78,77 @@ public interface SysKnowledgeBaseService {
      * @return Result 更新后的知识库完整信息
      */
     Result<KnowledgeBase> updateTeamKnowledgeBase(UpdateKnowledgeBaseDto updateKnowledgeBaseDto);
+
+    /**
+     * 逻辑删除个人知识库
+     * <p>
+     * 将当前用户拥有的个人知识库标记为已删除（status=0），
+     * 知识库数据仍保留在数据库中，可通过恢复接口还原。
+     * 已停用的知识库不能再次删除，需先恢复。
+     * 删除后该知识库将不再出现在知识库列表中，
+     * 但关联的 Milvus Collection 不会被立即删除（保留30天，过期后自动清理）。
+     * <p>
+     * <b>校验规则：</b>
+     * <ul>
+     *     <li>知识库必须存在</li>
+     *     <li>知识库必须属于当前用户</li>
+     *     <li>知识库必须是个人知识库（isTeam=0）</li>
+     *     <li>知识库必须处于正常状态（status=1）</li>
+     * </ul>
+     *
+     * @param id 知识库ID
+     * @return Result 删除结果，成功返回被删除的知识库信息（status已变为0）
+     */
+    Result<KnowledgeBase> logicDeleteKnowledgeBase( Integer id);
+
+    /**
+     * 强制删除知识库（物理删除，不可恢复）
+     * <p>
+     * 立即从数据库和 Milvus 中永久删除知识库及其所有数据（包括文档向量），
+     * 删除后数据不可恢复，请谨慎操作。
+     * <p>
+     * <b>权限要求：</b>
+     * <ul>
+     *     <li>用户必须登录</li>
+     *     <li>知识库必须属于当前用户</li>
+     *     <li>知识库必须是个人知识库（团队知识库需通过团队管理接口删除）</li>
+     * </ul>
+     * <p>
+     * <b>操作行为：</b>
+     * <ul>
+     *     <li>物理删除 MySQL 记录（不经过软删除）</li>
+     *     <li>调用 Python 服务删除 Milvus Collection</li>
+     *     <li>删除所有关联的 Agent 绑定记录</li>
+     * </ul>
+     * <p>
+     * <b>风险提示：</b>
+     * <ul>
+     *     <li>此操作不可逆，删除后数据无法恢复</li>
+     *     <li>建议前端调用前进行二次确认</li>
+     * </ul>
+     *
+     * @param id 知识库ID
+     * @return Result 删除结果，成功返回空数据
+     */
+    Result<Void> forceDeleteKnowledgeBase( Integer id);
+
+    /**
+     * 恢复已删除的知识库
+     * <p>
+     * 将处于回收站（status=0）的知识库恢复为正常状态（status=1），
+     * 恢复后知识库将重新出现在列表中，可正常使用。
+     * 仅限知识库所有者操作，团队知识库需管理员权限。
+     * <p>
+     * <b>前提条件：</b>
+     * <ul>
+     *     <li>知识库必须存在</li>
+     *     <li>知识库必须处于已删除状态（status=0）</li>
+     *     <li>当前用户必须是知识库所有者（个人知识库）</li>
+     *     <li>当前用户必须是团队管理员（团队知识库）</li>
+     * </ul>
+     *
+     * @param id 知识库ID
+     * @return Result 恢复成功，返回恢复后的知识库完整信息（status已变为1）
+     */
+    Result<KnowledgeBase> restoreKnowledgeBase( Integer id);
 }

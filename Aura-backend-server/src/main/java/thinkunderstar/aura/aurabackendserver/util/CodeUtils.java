@@ -1,6 +1,7 @@
 package thinkunderstar.aura.aurabackendserver.util;
 
 import java.util.Random;
+import java.util.UUID;
 
 /**
  * 获取验证码
@@ -22,5 +23,13 @@ public class CodeUtils {
             sb.append(chars.charAt(index));
         }
         return sb.toString();
+    }
+
+    /**
+     * 生成团队邀请码
+     * 格式：aura-{UUID}，如 aura-550e8400e29b41d4a716446655440000
+     */
+    public static String generateInviteCode() {
+        return "aura-" + UUID.randomUUID().toString().replace("-", "");
     }
 }

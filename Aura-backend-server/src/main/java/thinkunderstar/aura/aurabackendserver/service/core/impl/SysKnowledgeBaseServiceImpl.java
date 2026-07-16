@@ -9,15 +9,18 @@ import org.springframework.transaction.annotation.Transactional;
 import thinkunderstar.aura.aurabackendserver.common.Result;
 import thinkunderstar.aura.aurabackendserver.dto.request.CreateKnowledgeBaseDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.UpdateKnowledgeBaseDto;
+import thinkunderstar.aura.aurabackendserver.entity.AgentKbBinding;
 import thinkunderstar.aura.aurabackendserver.entity.KnowledgeBase;
 import thinkunderstar.aura.aurabackendserver.entity.Workspace;
 import thinkunderstar.aura.aurabackendserver.entity.WorkspaceMember;
 import thinkunderstar.aura.aurabackendserver.exception.BusinessException;
+import thinkunderstar.aura.aurabackendserver.mapper.AgentKbBindingMapper;
 import thinkunderstar.aura.aurabackendserver.mapper.KnowledgeBaseMapper;
 import thinkunderstar.aura.aurabackendserver.mapper.WorkspaceMemberMapper;
 import thinkunderstar.aura.aurabackendserver.service.core.SysKnowledgeBaseService;
 import thinkunderstar.aura.aurabackendserver.service.wrapper.KnowledgeBaseService;
 import thinkunderstar.aura.aurabackendserver.service.wrapper.WorkspaceService;
+import thinkunderstar.aura.aurabackendserver.util.RedisTokenBucketLimiter;
 
 import java.util.Arrays;
 import java.util.List;
@@ -30,12 +33,23 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
     private final KnowledgeBaseMapper knowledgeBaseMapper;
     private final WorkspaceService workspaceService;
     private final WorkspaceMemberMapper workspaceMemberMapper;
+    private final RedisTokenBucketLimiter redisTokenBucketLimiter;
+    private final AgentKbBindingMapper agentKbBindingMapper;
 
-    public SysKnowledgeBaseServiceImpl(KnowledgeBaseService knowledgeBaseService, KnowledgeBaseMapper knowledgeBaseMapper, WorkspaceService workspaceService, WorkspaceMemberMapper workspaceMemberMapper) {
+    public SysKnowledgeBaseServiceImpl(
+            KnowledgeBaseService knowledgeBaseService,
+            KnowledgeBaseMapper knowledgeBaseMapper,
+            WorkspaceService workspaceService,
+            WorkspaceMemberMapper workspaceMemberMapper,
+            RedisTokenBucketLimiter redisTokenBucketLimiter,
+            AgentKbBindingMapper agentKbBindingMapper
+    ) {
         this.knowledgeBaseService = knowledgeBaseService;
         this.knowledgeBaseMapper = knowledgeBaseMapper;
         this.workspaceService = workspaceService;
         this.workspaceMemberMapper = workspaceMemberMapper;
+        this.redisTokenBucketLimiter = redisTokenBucketLimiter;
+        this.agentKbBindingMapper = agentKbBindingMapper;
     }
 
     @Override
@@ -55,8 +69,14 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
             throw new BusinessException("知识库是否从属团队参数失效");
         }
 
+        long loginId = StpUtil.getLoginIdAsLong();
+
+        if (!redisTokenBucketLimiter.tryAcquireByUser(String.valueOf(loginId),3,1)){
+            throw new BusinessException("创建数据库过于频繁，请稍后再试");
+        }
+
         KnowledgeBase knowledgeBase = new KnowledgeBase(
-                StpUtil.getLoginIdAsLong(),
+                loginId,
                 createKnowledgeBaseDto.getIsTeam(),
                 createKnowledgeBaseDto.getName(),
                 createKnowledgeBaseDto.getDescription()
@@ -96,6 +116,10 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
             throw new BusinessException("知识库修改接口中的修改类型参数为空");
         }
 
+        if (!redisTokenBucketLimiter.tryAcquireByUser(StpUtil.getLoginIdAsString(),10,2)){
+            throw new BusinessException("修改过去频繁，请稍后再试");
+        }
+
         //验证知识库是否存在,是否是私人知识库，是否从属于该用户
         KnowledgeBase knowledgeBase = knowledgeBaseService.getById(updateKnowledgeBaseDto.getKbId());
 
@@ -133,6 +157,10 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
 
         if (updateKnowledgeBaseDto.getType() == null){
             throw new BusinessException("知识库修改接口中的修改类型参数为空");
+        }
+
+        if (!redisTokenBucketLimiter.tryAcquireByUser(StpUtil.getLoginIdAsString(),10,2)){
+            throw new BusinessException("修改过去频繁，请稍后再试");
         }
 
         //验证知识库是否存在,是否是团队绑定的知识库，改用户是否有管理员权限
@@ -184,6 +212,103 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
         }
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Result<KnowledgeBase> logicDeleteKnowledgeBase(Integer id) {
+        if (id == null) {
+            throw new BusinessException("知识库ID接收失败");
+        }
+
+        //用户限速
+        if (!redisTokenBucketLimiter.tryAcquireByUser(StpUtil.getLoginIdAsString(),5,1)){
+            throw new BusinessException("删除操作过于频繁");
+        }
+
+        KnowledgeBase knowledgeBase = knowledgeBaseService.getById(id);
+
+        if (knowledgeBase == null) {
+            throw new BusinessException("未查询到该知识库");
+        }
+
+        if (knowledgeBase.getOwnerId() != StpUtil.getLoginIdAsLong()) {
+            throw new BusinessException("您没有权限删除该知识库");
+        }
+
+        //知识库删除逻辑
+        knowledgeBase.setStatus(0);
+        deleteAgentKbBindings(id);
+        knowledgeBaseService.updateById(knowledgeBase);
+
+        return Result.success(knowledgeBase);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Result<Void> forceDeleteKnowledgeBase(Integer id) {
+        if (id == null) {
+            throw new BusinessException("知识库ID接收失败");
+        }
+
+        //用户限速
+        if (!redisTokenBucketLimiter.tryAcquireByUser(StpUtil.getLoginIdAsString(),5,1)){
+            throw new BusinessException("删除操作过于频繁");
+        }
+
+        KnowledgeBase knowledgeBase = knowledgeBaseService.getById(id);
+
+        if (knowledgeBase == null) {
+            throw new BusinessException("未查询到该知识库");
+        }
+
+        if (knowledgeBase.getOwnerId() != StpUtil.getLoginIdAsLong()) {
+            throw new BusinessException("您没有权限强制删除该知识库");
+        }
+
+        //删除mysql中存储的数据
+        knowledgeBaseService.removeById(id);
+        //调用python端接口删除
+        log.warn("python端删除知识库的接口未完成");
+
+        return Result.success();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Result<KnowledgeBase> restoreKnowledgeBase(Integer id) {
+        if (id == null) {
+            throw new BusinessException("知识库ID接收失败");
+        }
+
+        //用户限速
+        if (!redisTokenBucketLimiter.tryAcquireByUser(StpUtil.getLoginIdAsString(),5,1)){
+            throw new BusinessException("恢复操作过于频繁");
+        }
+
+        KnowledgeBase knowledgeBase = knowledgeBaseService.getById(id);
+
+        if (knowledgeBase == null) {
+            throw new BusinessException("数据库可能已被彻底删除");
+        }
+
+        if (knowledgeBase.getOwnerId() != StpUtil.getLoginIdAsLong()) {
+            throw new BusinessException("您没有权限恢复该知识库");
+        }
+
+        if (knowledgeBase.getStatus() == 1) {
+            throw new BusinessException("该数据库并没有被删除");
+        }
+
+        if (knowledgeBase.getIsTeam() == 1) {
+            throw new BusinessException("团队数据库无法恢复");
+        }
+
+        //恢复知识库的业务代码
+        knowledgeBase.setStatus(1);
+        knowledgeBaseService.updateById(knowledgeBase);
+
+        return Result.success(knowledgeBase);
+    }
+
     private Result<KnowledgeBase> updateKnowledgeBaseName(String name , KnowledgeBase knowledgeBase) {
         if (name == null || name.isEmpty()){
             throw new BusinessException("知识库的名字不能为空");
@@ -212,5 +337,16 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
         knowledgeBaseService.updateById(knowledgeBase);
 
         return Result.success(knowledgeBase);
+    }
+
+    private void deleteAgentKbBindings(Integer kbId){
+        List<Long> agentKbList = agentKbBindingMapper.selectList(
+                        new LambdaQueryWrapper<AgentKbBinding>()
+                                .eq(AgentKbBinding::getKbId, kbId)
+                ).stream()
+                .map(AgentKbBinding::getId)
+                .collect(Collectors.toList());
+
+        agentKbBindingMapper.deleteByIds(agentKbList);
     }
 }
