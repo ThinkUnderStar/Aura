@@ -4,24 +4,26 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import thinkunderstar.aura.aurabackendserver.common.Result;
 import thinkunderstar.aura.aurabackendserver.dto.request.CreateKnowledgeBaseDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.UpdateKnowledgeBaseDto;
-import thinkunderstar.aura.aurabackendserver.entity.AgentKbBinding;
-import thinkunderstar.aura.aurabackendserver.entity.KnowledgeBase;
-import thinkunderstar.aura.aurabackendserver.entity.Workspace;
-import thinkunderstar.aura.aurabackendserver.entity.WorkspaceMember;
+import thinkunderstar.aura.aurabackendserver.entity.*;
 import thinkunderstar.aura.aurabackendserver.exception.BusinessException;
 import thinkunderstar.aura.aurabackendserver.mapper.AgentKbBindingMapper;
 import thinkunderstar.aura.aurabackendserver.mapper.KnowledgeBaseMapper;
 import thinkunderstar.aura.aurabackendserver.mapper.WorkspaceMemberMapper;
 import thinkunderstar.aura.aurabackendserver.service.core.SysKnowledgeBaseService;
 import thinkunderstar.aura.aurabackendserver.service.wrapper.KnowledgeBaseService;
+import thinkunderstar.aura.aurabackendserver.service.wrapper.UserService;
+import thinkunderstar.aura.aurabackendserver.service.wrapper.WorkspaceOperationLogService;
 import thinkunderstar.aura.aurabackendserver.service.wrapper.WorkspaceService;
 import thinkunderstar.aura.aurabackendserver.util.RedisTokenBucketLimiter;
 
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -35,6 +37,9 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
     private final WorkspaceMemberMapper workspaceMemberMapper;
     private final RedisTokenBucketLimiter redisTokenBucketLimiter;
     private final AgentKbBindingMapper agentKbBindingMapper;
+    private final TransactionTemplate transactionTemplate;
+    private final UserService userService;
+    private final WorkspaceOperationLogService workspaceOperationLogService;
 
     public SysKnowledgeBaseServiceImpl(
             KnowledgeBaseService knowledgeBaseService,
@@ -42,14 +47,17 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
             WorkspaceService workspaceService,
             WorkspaceMemberMapper workspaceMemberMapper,
             RedisTokenBucketLimiter redisTokenBucketLimiter,
-            AgentKbBindingMapper agentKbBindingMapper
-    ) {
+            AgentKbBindingMapper agentKbBindingMapper,
+            TransactionTemplate transactionTemplate, UserService userService, WorkspaceOperationLogService workspaceOperationLogService) {
         this.knowledgeBaseService = knowledgeBaseService;
         this.knowledgeBaseMapper = knowledgeBaseMapper;
         this.workspaceService = workspaceService;
         this.workspaceMemberMapper = workspaceMemberMapper;
         this.redisTokenBucketLimiter = redisTokenBucketLimiter;
         this.agentKbBindingMapper = agentKbBindingMapper;
+        this.transactionTemplate = transactionTemplate;
+        this.userService = userService;
+        this.workspaceOperationLogService = workspaceOperationLogService;
     }
 
     @Override
@@ -150,6 +158,7 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Result<KnowledgeBase> updateTeamKnowledgeBase(UpdateKnowledgeBaseDto updateKnowledgeBaseDto) {
         if (updateKnowledgeBaseDto == null) {
             throw new BusinessException("知识库修改接口并未正常接收参数");
@@ -188,24 +197,52 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
         }
 
         Long workspaceId = workspace.getId();
-
         List<Long> adminIdList = workspaceMemberMapper.selectList(
                         new LambdaQueryWrapper<WorkspaceMember>()
                                 .eq(WorkspaceMember::getWorkspaceId, workspaceId)
+                                .eq(WorkspaceMember::getStatus,1)
                                 .in(WorkspaceMember::getRole, Arrays.asList(0,1))
                                 .select(WorkspaceMember::getUserId)
                 ).stream()
                 .map(WorkspaceMember::getUserId)
                 .collect(Collectors.toList());
 
-        if (!adminIdList.contains(StpUtil.getLoginIdAsLong())) {
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (!adminIdList.contains(loginId)) {
             throw new BusinessException("您没有权限修改该知识库");
         }
 
         //修改知识库信息的业务代码
+        //添加团队日志
+        String username = userService.getById(loginId).getUsername();
+
+        WorkspaceOperationLog workspaceOperationLog = new WorkspaceOperationLog();
+        workspaceOperationLog.setWorkspaceId(workspaceId);
+        workspaceOperationLog.setModule("knowledge_base");
+        workspaceOperationLog.setOperation("update");
+        workspaceOperationLog.setStatus(1);
+        workspaceOperationLog.setUserId(loginId);
+        workspaceOperationLog.setUsername(username);
+
         if (updateKnowledgeBaseDto.getType().equals("name")){
+            String requestSummary = "用户: "
+                    + username
+                    + " 将团队知识库的名字从 "
+                    + knowledgeBase.getName()
+                    + " 改为: "
+                    + updateKnowledgeBaseDto.getName();
+            workspaceOperationLog.setRequestSummary(requestSummary);
+            workspaceOperationLogService.save(workspaceOperationLog);
             return updateKnowledgeBaseName(updateKnowledgeBaseDto.getName(), knowledgeBase);
         } else if (updateKnowledgeBaseDto.getType().equals("description")) {
+            String requestSummary = "用户: "
+                    + username
+                    + " 将团队知识库的描述从 "
+                    + knowledgeBase.getDescription()
+                    + " 改为: "
+                    + updateKnowledgeBaseDto.getDescription();
+            workspaceOperationLog.setRequestSummary(requestSummary);
+            workspaceOperationLogService.save(workspaceOperationLog);
             return updateKnowledgeBaseDescription(updateKnowledgeBaseDto.getDescription(), knowledgeBase);
         }else {
             throw new BusinessException("知识库修改接口中的修改类型参数不符合规范");
@@ -348,5 +385,31 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
                 .collect(Collectors.toList());
 
         agentKbBindingMapper.deleteByIds(agentKbList);
+    }
+
+    @Scheduled(cron = "0 * * * * ?")
+    public void cleanExpiredKnowledgeBases() {
+        LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
+
+        List<Long> expiredKnowledgeBaseIds = knowledgeBaseMapper.selectList(
+                        new LambdaQueryWrapper<KnowledgeBase>()
+                                .eq(KnowledgeBase::getIsTeam, 0)
+                                .eq(KnowledgeBase::getStatus, 0)
+                                .le(KnowledgeBase::getUpdateTime, thirtyDaysAgo)
+                ).stream()
+                .map(KnowledgeBase::getId)
+                .collect(Collectors.toList());
+
+        for (Long expiredKnowledgeBaseId : expiredKnowledgeBaseIds) {
+            try {
+                transactionTemplate.execute(status -> {
+                    knowledgeBaseService.removeById(expiredKnowledgeBaseId);
+                    log.warn("python端删除milvus数据库的接口未完成");
+                    return null;
+                });
+            } catch (Exception e){
+                log.error("清理失败: {}", expiredKnowledgeBaseId, e);  // 只打日志
+            }
+        }
     }
 }

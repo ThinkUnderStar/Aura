@@ -19,6 +19,11 @@ public class WorkspaceMember {
      */
     private Integer role;
 
+    /**
+     * 0-不在团队中 1-在团队中
+     */
+    private Integer status;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime joinedAt;
 

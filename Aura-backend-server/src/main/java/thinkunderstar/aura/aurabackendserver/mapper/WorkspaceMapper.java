@@ -12,11 +12,10 @@ public interface WorkspaceMapper extends BaseMapper<Workspace> {
     /**
      * 分页查询用户加入的团队列表（按创建时间倒序）
      */
-    @Select("SELECT w.*, wm.role " +
+    @Select("SELECT w.*, wm.role, wm.status AS member_status " +
             "FROM workspaces w " +
             "JOIN workspace_members wm ON w.id = wm.workspace_id " +
             "WHERE wm.user_id = #{userId} " +
-            "AND w.status = 1 " +
-            "ORDER BY w.create_time DESC")
+            "ORDER BY w.status DESC, w.create_time DESC")
     IPage<WorkspaceVODto> selectUserWorkspaces(Page<WorkspaceVODto> page, @Param("userId") Long userId);
 }

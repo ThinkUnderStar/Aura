@@ -2,9 +2,9 @@ package thinkunderstar.aura.aurabackendserver.service.core;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 import thinkunderstar.aura.aurabackendserver.common.Result;
+import thinkunderstar.aura.aurabackendserver.dto.request.UpdateWorkspaceDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.WorkspaceDto;
 import thinkunderstar.aura.aurabackendserver.dto.response.WorkspaceVODto;
 
@@ -61,4 +61,63 @@ public interface SysWorkspaceService {
      * @return Result 上传结果，成功时返回 Logo 访问路径
      */
     Result<Void> logo(Long workspaceId,MultipartFile file);
+
+    /**
+     * 更新团队信息
+     * <p>
+     * 更新当前用户所在团队的名称和/或描述信息。
+     * 仅团队管理员（群主或管理员）可以操作。
+     * 更新成功后，团队的 updateTime 字段会自动刷新。
+     * 如果名称未变化，不会触发额外校验，直接返回成功。
+     * <p>
+     * <b>权限要求：</b>
+     * <ul>
+     *     <li>用户必须已登录</li>
+     *     <li>用户必须是该团队的群主（role=0）或管理员（role=1）</li>
+     * </ul>
+     * <p>
+     * <b>校验规则：</b>
+     * <ul>
+     *     <li>团队名称不能为空（如果传入）</li>
+     *     <li>团队描述可为空</li>
+     *     <li>团队必须存在且状态正常（未解散）</li>
+     * </ul>
+     *
+     * @param updateWorkspaceDto 更新请求参数，包含团队ID、名称、描述
+     * @return Result 更新成功，返回更新后的团队信息（WorkspaceVODto）
+     */
+    Result<WorkspaceVODto> updateWorkspace(UpdateWorkspaceDto updateWorkspaceDto);
+
+    /**
+     * 解散团队
+     * <p>
+     * 群主解散团队，执行逻辑删除（status=0），团队及其关联数据（知识库、成员关系）将被标记为已解散。
+     * 解散后团队不再可用，但数据保留30天，30天后由定时任务自动清理。
+     * 已解散的团队仍会显示在团队列表中，状态标记为“已解散”，用户可手动清除记录。
+     * <p>
+     * <b>权限要求：</b>
+     * <ul>
+     *     <li>用户必须已登录</li>
+     *     <li>用户必须是该团队的群主（role=0）</li>
+     * </ul>
+     * <p>
+     * <b>操作影响：</b>
+     * <ul>
+     *     <li>团队状态变为已解散（status=0）</li>
+     *     <li>关联知识库被标记为已删除（status=0）</li>
+     *     <li>解除所有 Agent 与知识库的绑定</li>
+     *     <li>团队成员关系保留，成员可在列表中看到“已解散”状态</li>
+     *     <li>Milvus Collection 立即删除（释放向量存储资源）</li>
+     * </ul>
+     * <p>
+     * <b>注意：</b>
+     * <ul>
+     *     <li>此操作为逻辑删除，30天内可通过恢复接口恢复（待实现）</li>
+     *     <li>如需立即清除记录，可调用清除接口 /workspace/clear/{workspaceId}</li>
+     * </ul>
+     *
+     * @param workspaceId 团队ID
+     * @return Result 解散结果，成功返回空数据
+     */
+    Result<Void> deleteWorkspace( Long workspaceId);
 }

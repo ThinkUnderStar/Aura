@@ -131,6 +131,11 @@ public class SysUserServiceImpl implements SysUserService {
         }
 
         long loginId = StpUtil.getLoginIdAsLong();
+        //令牌桶算法，按用户限流
+        if (!redisTokenBucketLimiter.tryAcquireByUser(String.valueOf(loginId),5,1)){
+            throw new BusinessException("修改logo过于频繁，请稍后再试");
+        }
+
         User user = userService.getById(loginId);
 
         if (!(user.getAvatar() == null || user.getAvatar().isEmpty())) {
@@ -146,7 +151,7 @@ public class SysUserServiceImpl implements SysUserService {
         try {
             file.transferTo(Path.of("./docs"+avatar).toFile());
         } catch (IOException e) {
-            log.warn("用户:"+StpUtil.getLoginIdAsString()+"的头像文件上传失败");
+            log.error("用户:"+StpUtil.getLoginIdAsString()+"的头像文件上传失败");
             throw new BusinessException("头像文件上传失败");
         }
 

@@ -20,6 +20,10 @@ public class WorkspaceVODto {
      * 1-正常 0-已解散
      */
     private Integer status;
+    /**
+     * 0-被踢除团队 1-在团队之中
+     */
+    private Integer memberStatus;
 
     private LocalDateTime createTime;
 
@@ -41,5 +45,8 @@ public class WorkspaceVODto {
         this.inviteCode = inviteCode;
         this.status = status;
         this.createTime = createTime;
+    }
+
+    public WorkspaceVODto() {
     }
 }
