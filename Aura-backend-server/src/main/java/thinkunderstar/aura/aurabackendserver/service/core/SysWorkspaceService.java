@@ -7,6 +7,9 @@ import thinkunderstar.aura.aurabackendserver.common.Result;
 import thinkunderstar.aura.aurabackendserver.dto.request.UpdateWorkspaceDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.WorkspaceDto;
 import thinkunderstar.aura.aurabackendserver.dto.response.WorkspaceVODto;
+import thinkunderstar.aura.aurabackendserver.entity.WorkspaceOperationLog;
+
+import java.util.List;
 
 public interface SysWorkspaceService {
     /**
@@ -92,7 +95,6 @@ public interface SysWorkspaceService {
      * 解散团队
      * <p>
      * 群主解散团队，执行逻辑删除（status=0），团队及其关联数据（知识库、成员关系）将被标记为已解散。
-     * 解散后团队不再可用，但数据保留30天，30天后由定时任务自动清理。
      * 已解散的团队仍会显示在团队列表中，状态标记为“已解散”，用户可手动清除记录。
      * <p>
      * <b>权限要求：</b>
@@ -109,15 +111,65 @@ public interface SysWorkspaceService {
      *     <li>团队成员关系保留，成员可在列表中看到“已解散”状态</li>
      *     <li>Milvus Collection 立即删除（释放向量存储资源）</li>
      * </ul>
-     * <p>
-     * <b>注意：</b>
-     * <ul>
-     *     <li>此操作为逻辑删除，30天内可通过恢复接口恢复（待实现）</li>
-     *     <li>如需立即清除记录，可调用清除接口 /workspace/clear/{workspaceId}</li>
-     * </ul>
      *
      * @param workspaceId 团队ID
      * @return Result 解散结果，成功返回空数据
      */
-    Result<Void> deleteWorkspace( Long workspaceId);
+    Result<List<WorkspaceOperationLog>> deleteWorkspace(Long workspaceId);
+
+    /**
+     * 清除团队通知记录
+     * <p>
+     * 用户主动清除已解散团队或已被移出团队的通知记录。
+     * 实际执行的是删除当前用户在 workspace_members 表中的关联记录。
+     * 清除后，该团队将从用户的团队列表中消失。
+     * <p>
+     * <b>适用场景：</b>
+     * <ul>
+     *     <li>用户看到团队已解散的通知，点击清除</li>
+     *     <li>用户被管理员移出团队，点击清除</li>
+     * </ul>
+     * <p>
+     * <b>权限要求：</b>
+     * <ul>
+     *     <li>用户必须已登录</li>
+     *     <li>用户必须是该团队的成员（workspace_members 表中存在记录）</li>
+     * </ul>
+     * <p>
+     * <b>注意：</b>
+     * <ul>
+     *     <li>此操作仅删除当前用户的成员记录，不影响其他成员</li>
+     *     <li>群主解散团队后，自己的记录也可通过此接口清除</li>
+     *     <li>清除后该团队不再出现在用户的团队列表中</li>
+     * </ul>
+     *
+     * @param workspaceId 团队ID
+     * @return Result 清除结果，成功返回空数据
+     */
+    Result<Void> cleanWorkspace(Long workspaceId);
+
+    /**
+     * 重置团队邀请码
+     * <p>
+     * 管理员主动更新团队的邀请码，重置后旧邀请码立即失效，
+     * 新邀请码将作为返回值直接返回给前端。
+     * 此操作不会影响已有的团队成员，仅影响后续新成员通过邀请码加入。
+     * <p>
+     * <b>权限要求：</b>
+     * <ul>
+     *     <li>用户必须已登录</li>
+     *     <li>用户必须是该团队的群主（role=0）或管理员（role=1）</li>
+     * </ul>
+     * <p>
+     * <b>使用场景：</b>
+     * <ul>
+     *     <li>邀请码泄露，需要紧急更换</li>
+     *     <li>团队安全升级，定期更换邀请码</li>
+     *     <li>团队信息变更，同步更新邀请码</li>
+     * </ul>
+     *
+     * @param workspaceId 团队ID
+     * @return Result 重置结果，成功时返回新的邀请码（格式：aura-{UUID}），失败时返回错误信息
+     */
+    Result<String> resetInviteCode( Long workspaceId);
 }

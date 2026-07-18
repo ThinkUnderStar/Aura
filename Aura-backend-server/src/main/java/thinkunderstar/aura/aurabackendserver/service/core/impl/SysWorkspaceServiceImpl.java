@@ -6,8 +6,10 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import thinkunderstar.aura.aurabackendserver.common.Result;
 import thinkunderstar.aura.aurabackendserver.dto.request.CreateKnowledgeBaseDto;
@@ -21,6 +23,7 @@ import thinkunderstar.aura.aurabackendserver.entity.WorkspaceOperationLog;
 import thinkunderstar.aura.aurabackendserver.exception.BusinessException;
 import thinkunderstar.aura.aurabackendserver.mapper.WorkspaceMapper;
 import thinkunderstar.aura.aurabackendserver.mapper.WorkspaceMemberMapper;
+import thinkunderstar.aura.aurabackendserver.mapper.WorkspaceOperationLogMapper;
 import thinkunderstar.aura.aurabackendserver.service.core.SysKnowledgeBaseService;
 import thinkunderstar.aura.aurabackendserver.service.core.SysWorkspaceService;
 import thinkunderstar.aura.aurabackendserver.service.wrapper.UserService;
@@ -49,6 +52,8 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
     private final WorkspaceMemberMapper workspaceMemberMapper;
     private final UserService userService;
     private final WorkspaceOperationLogService workspaceOperationLogService;
+    private final TransactionTemplate transactionTemplate;
+    private final WorkspaceOperationLogMapper workspaceOperationLogMapper;
 
     public SysWorkspaceServiceImpl(
             WorkspaceMapper workspaceMapper,
@@ -56,7 +61,7 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
             WorkspaceService workspaceService,
             SysKnowledgeBaseService sysKnowledgeBaseService,
             WorkspaceMemberService workspaceMemberService,
-            WorkspaceMemberMapper workspaceMemberMapper, UserService userService, WorkspaceOperationLogService workspaceOperationLogService) {
+            WorkspaceMemberMapper workspaceMemberMapper, UserService userService, WorkspaceOperationLogService workspaceOperationLogService, TransactionTemplate transactionTemplate, WorkspaceOperationLogMapper workspaceOperationLogMapper) {
         this.workspaceMapper = workspaceMapper;
         this.redisTokenBucketLimiter = redisTokenBucketLimiter;
         this.workspaceService = workspaceService;
@@ -65,10 +70,25 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
         this.workspaceMemberMapper = workspaceMemberMapper;
         this.userService = userService;
         this.workspaceOperationLogService = workspaceOperationLogService;
+        this.transactionTemplate = transactionTemplate;
+        this.workspaceOperationLogMapper = workspaceOperationLogMapper;
     }
 
     @Override
     public Result<IPage<WorkspaceVODto>> getMyWorkspaces(int page, int size) {
+        // 限制 page
+        if (page < 1) {
+            page = 1;
+        }
+
+        // 限制 size
+        if (size < 1) {
+            size = 20;
+        }
+        if (size > 100) {
+            size = 100;
+        }
+
         long loginId = StpUtil.getLoginIdAsLong();
 
         Page<WorkspaceVODto> pageVO = new Page<>(page, size);
@@ -340,7 +360,7 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Result<Void> deleteWorkspace(Long workspaceId) {
+    public Result<List<WorkspaceOperationLog>> deleteWorkspace(Long workspaceId) {
         if (workspaceId == null) {
             throw new BusinessException("解散团队接口的参数接收异常");
         }
@@ -360,6 +380,25 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
             throw new BusinessException("您无权解散该团队");
         }
 
+        //添加一条日志
+        String username = userService.getById(loginId).getUsername();
+        WorkspaceOperationLog workspaceOperationLog = new WorkspaceOperationLog();
+        workspaceOperationLog.setWorkspaceId(workspace.getId());
+        workspaceOperationLog.setUsername(username);
+        workspaceOperationLog.setUserId(loginId);
+        workspaceOperationLog.setModule("workspace");
+        workspaceOperationLog.setOperation("delete");
+        workspaceOperationLog.setRequestSummary("用户: "+username+" 解散了团队");
+        workspaceOperationLog.setStatus(1);
+        workspaceOperationLogService.save(workspaceOperationLog);
+
+        //获取全部日志
+        List<WorkspaceOperationLog> workspaceOperationLogs = workspaceOperationLogMapper.selectList(
+                new LambdaQueryWrapper<WorkspaceOperationLog>()
+                        .eq(WorkspaceOperationLog::getWorkspaceId, workspace.getId())
+                        .orderByDesc(WorkspaceOperationLog::getCreateTime)
+        );
+
         //解散团队业务代码
         workspace.setStatus(0);
         //删除绑定的知识库
@@ -377,7 +416,82 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
         );
         workspaceMemberService.removeById(one.getId());
 
+        return Result.success(workspaceOperationLogs);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Result<Void> cleanWorkspace(Long workspaceId) {
+        if (workspaceId == null) {
+            throw new BusinessException("清除团队信息接口的参数接收异常");
+        }
+
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (!redisTokenBucketLimiter.tryAcquireByUser(String.valueOf(loginId),5,1)){
+            throw new BusinessException("用户清除操作过于频繁，请稍后再试");
+        }
+
+        Workspace workspace = workspaceService.getById(workspaceId);
+
+        if (workspace == null) {
+            throw new BusinessException("未查询到该团队");
+        }
+
+        WorkspaceMember member = workspaceMemberService.getOne(
+                new LambdaQueryWrapper<WorkspaceMember>()
+                        .eq(WorkspaceMember::getWorkspaceId, workspaceId)
+                        .eq(WorkspaceMember::getUserId, loginId)
+        );
+
+        if (member == null){
+            throw new BusinessException("你未加入该团队");
+        }
+
+        if (workspace.getStatus() == 0 || member.getStatus() == 0){
+            workspaceMemberService.removeById(member.getId());
+        }else {
+            throw new BusinessException("请调用退队接口");
+        }
+
         return Result.success();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Result<String> resetInviteCode(Long workspaceId) {
+        if (workspaceId == null) {
+            throw new BusinessException("更新邀请码接口的参数接收异常");
+        }
+
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (!redisTokenBucketLimiter.tryAcquireByUser(String.valueOf(loginId),3,1)){
+            throw new BusinessException("更新邀请码操作过于频繁，请稍后再试");
+        }
+
+        Workspace workspace = workspaceService.getById(workspaceId);
+        if (workspace == null || workspace.getStatus() == 0) {
+            throw new BusinessException("未查询到该团队");
+        }
+
+        List<Long> adminIds = workspaceMemberMapper.selectList(
+                        new LambdaQueryWrapper<WorkspaceMember>()
+                                .eq(WorkspaceMember::getWorkspaceId, workspace.getId())
+                                .eq(WorkspaceMember::getStatus, 1)
+                                .in(WorkspaceMember::getRole, Arrays.asList(0, 1))
+                ).stream()
+                .map(WorkspaceMember::getUserId)
+                .collect(Collectors.toList());
+
+        if (!adminIds.contains(loginId)) {
+            throw new BusinessException("您没有权限更新邀请码");
+        }
+
+        //生成新的邀请码
+        String newInviteCode = CodeUtils.generateInviteCode();
+        workspace.setInviteCode(newInviteCode);
+        workspaceService.updateById(workspace);
+
+        return Result.success(newInviteCode);
     }
 
     private Result<WorkspaceVODto> updateWorkspaceDescription(Workspace workspace, String description) {
@@ -455,5 +569,32 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
         return Result.success(workspaceVODto);
     }
 
+    /**
+     * 定时清除没有任何成员遗留的团队信息
+     */
+    @Scheduled(cron = "0 * * * * ?")
+    private void cleanDeletedWorkspaceInformation(){
+        workspaceMapper.selectList(
+                new LambdaQueryWrapper<Workspace>()
+                        .eq(Workspace::getStatus, 0)
+        ).stream()
+                .map(Workspace::getId)
+                .forEach(workspaceId -> {
+                    Long count = workspaceMemberMapper.selectCount(
+                            new LambdaQueryWrapper<WorkspaceMember>()
+                                    .eq(WorkspaceMember::getWorkspaceId, workspaceId)
+                    );
 
+                    if (count == 0) {
+                        try {
+                            transactionTemplate.execute(status -> {
+                                workspaceService.removeById(workspaceId);
+                                return null;
+                            });
+                        } catch (Exception e) {
+                            log.error("已被解散的团队: " + workspaceId + " 的驻留信息删除失败");
+                        }
+                    }
+                });
+    }
 }

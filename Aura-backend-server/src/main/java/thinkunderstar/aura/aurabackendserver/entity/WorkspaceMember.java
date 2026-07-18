@@ -33,6 +33,7 @@ public class WorkspaceMember {
         this.workspaceId = workspaceId;
         this.userId = userId;
         this.role = role;
+        this.status = 1;
     }
 
     public boolean isAdmin() {

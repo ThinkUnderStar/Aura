@@ -47,8 +47,8 @@ public class SysKnowledgeBaseController {
     @GetMapping("/get")
     @SaCheckLogin
     public Result<Page<KnowledgeBase>> getMyKnowledgeBases(
-            @RequestParam Integer page,
-            @RequestParam Integer pageSize
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "20") Integer pageSize
     ){
         return sysKnowledgeBaseService.getMyKnowledgeBases(page,pageSize);
     }

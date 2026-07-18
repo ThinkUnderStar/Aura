@@ -14,8 +14,12 @@ import thinkunderstar.aura.aurabackendserver.dto.request.RegisterAdminDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.RegisterUserDto;
 import thinkunderstar.aura.aurabackendserver.dto.response.UserVODto;
 import thinkunderstar.aura.aurabackendserver.entity.User;
+import thinkunderstar.aura.aurabackendserver.entity.Workspace;
+import thinkunderstar.aura.aurabackendserver.entity.WorkspaceMember;
 import thinkunderstar.aura.aurabackendserver.exception.AuthException;
 import thinkunderstar.aura.aurabackendserver.exception.BusinessException;
+import thinkunderstar.aura.aurabackendserver.mapper.WorkspaceMapper;
+import thinkunderstar.aura.aurabackendserver.mapper.WorkspaceMemberMapper;
 import thinkunderstar.aura.aurabackendserver.service.core.AuthService;
 import thinkunderstar.aura.aurabackendserver.service.wrapper.UserService;
 import thinkunderstar.aura.aurabackendserver.util.*;
@@ -33,17 +37,21 @@ public class AuthServiceImpl implements AuthService {
     private final HttpServletRequest httpServletRequest;
     private final UserService userService;
     private final RedisUtils redisUtils;
+    private final WorkspaceMapper workspaceMapper;
+    private final WorkspaceMemberMapper workspaceMemberMapper;
 
     public AuthServiceImpl(
             RedisTokenBucketLimiter redisTokenBucketLimiter,
             HttpServletRequest httpServletRequest,
             UserService userService,
-            RedisUtils redisUtils
-    ) {
+            RedisUtils redisUtils,
+            WorkspaceMapper workspaceMapper, WorkspaceMemberMapper workspaceMemberMapper) {
         this.redisTokenBucketLimiter = redisTokenBucketLimiter;
         this.httpServletRequest = httpServletRequest;
         this.userService = userService;
         this.redisUtils = redisUtils;
+        this.workspaceMapper = workspaceMapper;
+        this.workspaceMemberMapper = workspaceMemberMapper;
     }
 
     @Override
@@ -167,6 +175,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public Result<Void> delete() {
         long loginId = StpUtil.getLoginIdAsLong();
         StpUtil.logout();
@@ -174,6 +183,23 @@ public class AuthServiceImpl implements AuthService {
         if (user == null) {
             return Result.success();
         }
+
+        //若此账号是某个团队的创建者，则拦截注销请求
+        Long count = workspaceMapper.selectCount(
+                new LambdaQueryWrapper<Workspace>()
+                        .eq(Workspace::getOwnerId, user.getId())
+        );
+
+        if (count > 0) {
+            throw new BusinessException("请先转让创建者身份，再注销该账号");
+        }
+
+        //清除所有团队中有关此账号的信息
+        workspaceMemberMapper.delete(
+                new LambdaQueryWrapper<WorkspaceMember>()
+                        .eq(WorkspaceMember::getUserId, user.getId())
+        );
+
         user.setDeleted(1);
         userService.updateById(user);
         return Result.success();

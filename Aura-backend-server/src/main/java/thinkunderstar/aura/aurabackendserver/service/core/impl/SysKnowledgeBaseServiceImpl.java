@@ -99,6 +99,19 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
 
     @Override
     public Result<Page<KnowledgeBase>> getMyKnowledgeBases(Integer page, Integer pageSize) {
+        // 限制 page
+        if (page == null || page < 1) {
+            page = 1;
+        }
+
+        // 限制 size
+        if (pageSize == null || pageSize < 1) {
+            pageSize = 20;
+        }
+        if (pageSize > 100) {
+            pageSize = 100;
+        }
+
         Page<KnowledgeBase> knowledgeBasePage = new Page<>(page, pageSize);
 
         long loginId = StpUtil.getLoginIdAsLong();
