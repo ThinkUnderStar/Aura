@@ -220,4 +220,6 @@ public class SysWorkspaceController {
     public Result<String> resetInviteCode(@RequestParam Long workspaceId){
         return  sysWorkspaceService.resetInviteCode(workspaceId);
     }
+
+    //封禁团队接口
 }

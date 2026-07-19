@@ -1,8 +1,10 @@
 package thinkunderstar.aura.aurabackendserver.service.core;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import thinkunderstar.aura.aurabackendserver.common.Result;
+import thinkunderstar.aura.aurabackendserver.dto.request.SetRoleDto;
 import thinkunderstar.aura.aurabackendserver.dto.response.WorkspaceMemberVODto;
 import thinkunderstar.aura.aurabackendserver.dto.response.WorkspaceVODto;
 
@@ -111,4 +113,75 @@ public interface SysWorkspaceMemberService {
      * @return Result 移除结果
      */
     Result<Void> removeMember( Long workspaceId , Long userId);
+
+    /**
+     * 设置/取消成员的管理员身份
+     * <p>
+     * 群主统一管理团队成员的管理员权限，支持：
+     * <ul>
+     *     <li>设置管理员：将普通成员提升为管理员（role=1）</li>
+     *     <li>取消管理员：将管理员降级为普通成员（role=2）</li>
+     * </ul>
+     * <p>
+     * <b>权限要求：</b>
+     * <ul>
+     *     <li>用户必须已登录</li>
+     *     <li>用户必须是该团队的群主（role=0）</li>
+     * </ul>
+     * <p>
+     * <b>校验规则：</b>
+     * <ul>
+     *     <li>目标用户必须是该团队的有效成员（status=1）</li>
+     *     <li>不能对自己进行操作</li>
+     *     <li>不能对群主进行操作</li>
+     *     <li>设置管理员时，目标用户必须当前是普通成员</li>
+     *     <li>取消管理员时，目标用户必须当前是管理员</li>
+     * </ul>
+     * <p>
+     * <b>操作类型说明：</b>
+     * <ul>
+     *     <li>set_admin - 设置为管理员</li>
+     *     <li>remove_admin - 取消管理员</li>
+     * </ul>
+     * <p>
+     * <b>注意：</b>转让群主功能由独立接口 /owner/transfer 处理
+     *
+     * @param setRoleDto 身份设置请求参数，包含团队ID、目标用户ID、操作类型
+     * @return Result 操作成功，返回更新后的成员信息（WorkspaceMemberVODto）
+     */
+    Result<WorkspaceMemberVODto> setRole(SetRoleDto setRoleDto);
+
+    /**
+     * 转让创建者身份
+     * <p>
+     * 将当前团队的创建者（role=0）身份转让给指定的目标成员。
+     * 转让完成后，当前用户降级为普通成员（role=2），目标用户成为新创建者（role=0）。
+     * 转让后团队所有权变更，原创建者不再拥有管理权限。
+     * <p>
+     * <b>权限要求：</b>
+     * <ul>
+     *     <li>用户必须已登录</li>
+     *     <li>用户必须是该团队的创建者（role=0）</li>
+     * </ul>
+     * <p>
+     * <b>校验规则：</b>
+     * <ul>
+     *     <li>目标用户必须是该团队的有效成员（status=1）</li>
+     *     <li>不能将创建者身份转让给自己</li>
+     *     <li>目标用户不能已是创建者</li>
+     *     <li>团队必须处于正常状态（未解散）</li>
+     * </ul>
+     * <p>
+     * <b>转让后影响：</b>
+     * <ul>
+     *     <li>原创建者：role 0 → role 2（普通成员）</li>
+     *     <li>目标用户：role 1/2 → role 0（创建者）</li>
+     *     <li>操作日志记录本次转让</li>
+     * </ul>
+     *
+     * @param workspaceId 团队ID
+     * @param targetUserId 接收创建者身份的目标用户ID
+     * @return Result 转让成功，返回新创建者的成员信息（WorkspaceMemberVODto）
+     */
+    Result<WorkspaceMemberVODto> transferOwnership(Long workspaceId, Long targetUserId);
 }

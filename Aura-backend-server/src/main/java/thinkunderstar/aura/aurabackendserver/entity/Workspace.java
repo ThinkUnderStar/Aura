@@ -24,7 +24,7 @@ public class Workspace {
     private Long kbId;
 
     /**
-     * 1-正常 0-已解散
+     * 1-正常 0-已解散 2-被封禁
      */
     private Integer status;
 
