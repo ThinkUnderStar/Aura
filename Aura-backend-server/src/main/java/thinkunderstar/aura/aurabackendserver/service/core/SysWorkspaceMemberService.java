@@ -1,6 +1,7 @@
 package thinkunderstar.aura.aurabackendserver.service.core;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.springframework.web.bind.annotation.RequestParam;
 import thinkunderstar.aura.aurabackendserver.common.Result;
 import thinkunderstar.aura.aurabackendserver.dto.response.WorkspaceMemberVODto;
 import thinkunderstar.aura.aurabackendserver.dto.response.WorkspaceVODto;
@@ -64,4 +65,50 @@ public interface SysWorkspaceMemberService {
      *         </ul>
      */
     Result<WorkspaceVODto> joinWorkspace(String inviteCode);
+
+    /**
+     * 退出团队
+     * <p>
+     * 当前用户主动退出指定的团队，退出后：
+     * <ul>
+     *     <li>用户的成员记录被物理删除，不再出现在团队成员列表中</li>
+     *     <li>用户无法再查看该团队的文档、知识库及团队信息</li>
+     *     <li>用户的 Agent 与该团队的关联不再生效</li>
+     * </ul>
+     * <p>
+     * <b>权限要求：</b>
+     * <ul>
+     *     <li>用户必须已登录</li>
+     *     <li>用户必须是该团队的正常成员（status=1）</li>
+     *     <li>用户不能是群主（群主需先转让群主身份或解散团队）</li>
+     * </ul>
+     *
+     * @param workspaceId 团队ID
+     * @return Result 退出结果
+     */
+    Result<Void> quitWorkspace( Long workspaceId);
+
+    /**
+     * 移除团队成员（踢出团队）
+     * <p>
+     * 管理员将指定成员从团队中移除，被移除的成员：
+     * <ul>
+     *     <li>成员记录被物理删除，不再出现在团队成员列表中</li>
+     *     <li>无法再查看该团队的文档、知识库及团队信息</li>
+     *     <li>该用户的 Agent 与该团队的关联不再生效</li>
+     * </ul>
+     * <p>
+     * <b>权限要求：</b>
+     * <ul>
+     *     <li>用户必须已登录</li>
+     *     <li>用户必须是该团队的群主（role=0）或管理员（role=1）</li>
+     *     <li>不能移除自己（如需退出团队，请调用退出接口）</li>
+     *     <li>不能移除群主（群主需先转让身份）</li>
+     * </ul>
+     *
+     * @param workspaceId 团队ID
+     * @param userId 被移除的成员ID
+     * @return Result 移除结果
+     */
+    Result<Void> removeMember( Long workspaceId , Long userId);
 }

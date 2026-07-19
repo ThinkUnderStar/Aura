@@ -12,16 +12,19 @@ import thinkunderstar.aura.aurabackendserver.dto.response.WorkspaceVODto;
 import thinkunderstar.aura.aurabackendserver.entity.User;
 import thinkunderstar.aura.aurabackendserver.entity.Workspace;
 import thinkunderstar.aura.aurabackendserver.entity.WorkspaceMember;
+import thinkunderstar.aura.aurabackendserver.entity.WorkspaceOperationLog;
 import thinkunderstar.aura.aurabackendserver.exception.BusinessException;
 import thinkunderstar.aura.aurabackendserver.mapper.WorkspaceMemberMapper;
 import thinkunderstar.aura.aurabackendserver.service.core.SysWorkspaceMemberService;
 import thinkunderstar.aura.aurabackendserver.service.wrapper.UserService;
 import thinkunderstar.aura.aurabackendserver.service.wrapper.WorkspaceMemberService;
+import thinkunderstar.aura.aurabackendserver.service.wrapper.WorkspaceOperationLogService;
 import thinkunderstar.aura.aurabackendserver.service.wrapper.WorkspaceService;
 import thinkunderstar.aura.aurabackendserver.util.RedisTokenBucketLimiter;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -31,17 +34,19 @@ public class SysWorkspaceMemberServiceImpl implements SysWorkspaceMemberService 
     private final WorkspaceMemberService workspaceMemberService;
     private final WorkspaceMemberMapper workspaceMemberMapper;
     private final UserService userService;
+    private final WorkspaceOperationLogService workspaceOperationLogService;
 
     public SysWorkspaceMemberServiceImpl(
             RedisTokenBucketLimiter redisTokenBucketLimiter,
             WorkspaceService workspaceService,
             WorkspaceMemberService workspaceMemberService,
-            WorkspaceMemberMapper workspaceMemberMapper, UserService userService) {
+            WorkspaceMemberMapper workspaceMemberMapper, UserService userService, WorkspaceOperationLogService workspaceOperationLogService) {
         this.redisTokenBucketLimiter = redisTokenBucketLimiter;
         this.workspaceService = workspaceService;
         this.workspaceMemberService = workspaceMemberService;
         this.workspaceMemberMapper = workspaceMemberMapper;
         this.userService = userService;
+        this.workspaceOperationLogService = workspaceOperationLogService;
     }
 
     @Override
@@ -92,6 +97,8 @@ public class SysWorkspaceMemberServiceImpl implements SysWorkspaceMemberService 
                 new LambdaQueryWrapper<WorkspaceMember>()
                         .eq(WorkspaceMember::getWorkspaceId, workspace.getId())
                         .eq(WorkspaceMember::getStatus, 1)
+                        .orderByAsc(WorkspaceMember::getRole)
+                        .orderByAsc(WorkspaceMember::getJoinedAt)
         );
 
         List<WorkspaceMemberVODto> newRecords = workspaceMemberPage.getRecords()
@@ -199,6 +206,22 @@ public class SysWorkspaceMemberServiceImpl implements SysWorkspaceMemberService 
             }
         }
 
+        //添加一条日志
+        String username = userService.getById(loginId).getUsername();
+        WorkspaceOperationLog operationLog = new WorkspaceOperationLog();
+        operationLog.setWorkspaceId(workspace.getId());
+        operationLog.setUserId(loginId);
+        operationLog.setUsername(username);
+        operationLog.setModule("member");
+        operationLog.setOperation("create");
+        operationLog.setRequestSummary(
+                "用户: "
+                + username
+                +" 加入了该团队"
+        );
+        operationLog.setStatus(1);
+        workspaceOperationLogService.save(operationLog);
+
         WorkspaceVODto workspaceVODto = new WorkspaceVODto();
         BeanUtils.copyProperties(workspace, workspaceVODto);
 
@@ -206,5 +229,128 @@ public class SysWorkspaceMemberServiceImpl implements SysWorkspaceMemberService 
         workspaceVODto.setMemberStatus(member.getStatus());
 
         return Result.success(workspaceVODto);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Result<Void> quitWorkspace(Long workspaceId) {
+        if (workspaceId == null) {
+            throw new BusinessException("退出团队接口的参数接收异常");
+        }
+
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (!redisTokenBucketLimiter.tryAcquireByUser(String.valueOf(loginId),5,1)){
+            throw new BusinessException("退出团队操作过于频繁，请稍后再试");
+        }
+
+        Workspace workspace = workspaceService.getById(workspaceId);
+        if (workspace == null || workspace.getStatus() == 0) {
+            throw new BusinessException("未查询到该团队");
+        }
+
+        WorkspaceMember member = workspaceMemberService.getOne(
+                new LambdaQueryWrapper<WorkspaceMember>()
+                        .eq(WorkspaceMember::getWorkspaceId, workspace.getId())
+                        .eq(WorkspaceMember::getUserId, loginId)
+                        .eq(WorkspaceMember::getStatus, 1)
+        );
+
+        if (member == null){
+            throw new BusinessException("您不在该团队中");
+        }
+
+        if (member.getRole() == 0){
+            throw new BusinessException("请转让创建者身份后，再退出该团队");
+        }
+
+        workspaceMemberService.removeById(member.getId());
+
+        //添加一条日志
+        String username = userService.getById(loginId).getUsername();
+        WorkspaceOperationLog operationLog = new WorkspaceOperationLog();
+        operationLog.setWorkspaceId(workspace.getId());
+        operationLog.setUserId(loginId);
+        operationLog.setUsername(username);
+        operationLog.setModule("member");
+        operationLog.setOperation("delete");
+        operationLog.setRequestSummary(
+                "用户: "
+                        + username
+                        + " 退出了该团队"
+        );
+        operationLog.setStatus(1);
+        workspaceOperationLogService.save(operationLog);
+
+        return Result.success();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Result<Void> removeMember(Long workspaceId, Long userId) {
+        if (workspaceId == null || userId == null) {
+            throw new BusinessException("移除团队成员接口的参数接收异常");
+        }
+
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (!redisTokenBucketLimiter.tryAcquireByUser(String.valueOf(loginId),5,1)){
+            throw new BusinessException("移除团队成员过于频繁，请稍后再试");
+        }
+
+        Workspace workspace = workspaceService.getById(workspaceId);
+        if (workspace == null || workspace.getStatus() == 0) {
+            throw new BusinessException("未查询到该团队");
+        }
+
+        WorkspaceMember member = workspaceMemberService.getOne(
+                new LambdaQueryWrapper<WorkspaceMember>()
+                        .eq(WorkspaceMember::getWorkspaceId, workspace.getId())
+                        .eq(WorkspaceMember::getUserId, loginId)
+                        .eq(WorkspaceMember::getStatus, 1)
+        );
+
+        if (member == null || member.getRole() == 2){
+            throw new BusinessException("你无权移除该团队的成员");
+        }
+
+        WorkspaceMember targetMember = workspaceMemberService.getOne(
+                new LambdaQueryWrapper<WorkspaceMember>()
+                        .eq(WorkspaceMember::getWorkspaceId, workspace.getId())
+                        .eq(WorkspaceMember::getUserId, userId)
+                        .eq(WorkspaceMember::getStatus, 1)
+        );
+
+        if (targetMember == null){
+            throw new BusinessException("团队中不存在该成员");
+        }
+
+        if (Objects.equals(member.getUserId(), targetMember.getUserId())){
+            throw new BusinessException("不能移除自己");
+        }
+
+        if (member.getRole() == 1 && targetMember.getRole() != 2){
+            throw new BusinessException("您无权限移除该成员");
+        }
+
+        workspaceMemberService.removeById(targetMember.getId());
+
+        //添加一条日志
+        String username = userService.getById(loginId).getUsername();
+        WorkspaceOperationLog operationLog = new WorkspaceOperationLog();
+        operationLog.setWorkspaceId(workspaceId);
+        operationLog.setUserId(loginId);
+        operationLog.setUsername(username);
+        operationLog.setModule("member");
+        operationLog.setOperation("delete");
+        operationLog.setRequestSummary(
+                "管理员: "
+                        + username
+                        + " 将: "
+                        + userService.getById(targetMember.getUserId()).getUsername()
+                        + " 移除了团队"
+        );
+        operationLog.setStatus(1);
+        workspaceOperationLogService.save(operationLog);
+
+        return Result.success();
     }
 }
