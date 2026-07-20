@@ -5,6 +5,7 @@ import cn.dev33.satoken.annotation.SaCheckRole;
 import cn.dev33.satoken.stp.StpUtil;
 import org.springframework.web.bind.annotation.*;
 import thinkunderstar.aura.aurabackendserver.common.Result;
+import thinkunderstar.aura.aurabackendserver.dto.request.BanUserDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.LoginDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.RegisterAdminDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.RegisterUserDto;
@@ -109,5 +110,68 @@ public class AuthController {
     @SaCheckLogin
     public Result<Void> delete(){
         return authService.delete();
+    }
+
+    /**
+     * 封禁用户（管理员）
+     * <p>
+     * 管理员对指定用户进行封禁操作，支持：
+     * <ul>
+     *     <li>type=1：首次封禁，banReason 和 banTime 必填</li>
+     *     <li>type=2：延长封禁，banReason 可选（覆盖原 reason），banTime 必填</li>
+     * </ul>
+     * <p>
+     * <b>权限要求：</b>
+     * <ul>
+     *     <li>用户必须已登录</li>
+     *     <li>用户必须具有管理员角色（role=2）</li>
+     * </ul>
+     * <p>
+     * <b>校验规则：</b>
+     * <ul>
+     *     <li>不能封禁自己</li>
+     *     <li>不能封禁其他管理员</li>
+     *     <li>目标用户必须存在且未被封禁（type=1）或已被封禁（type=2）</li>
+     *     <li>type=1 时 banReason 不能为空</li>
+     *     <li>banTime 必须大于当前时间</li>
+     * </ul>
+     *
+     * @param banUserDto 封禁用户请求参数
+     * @return Result 封禁结果，成功返回空数据
+     */
+    @PutMapping("/ban")
+    @SaCheckLogin
+    @SaCheckRole("admin")
+    public Result<Void> ban(@RequestBody BanUserDto  banUserDto){
+        return  authService.ban(banUserDto);
+    }
+
+    /**
+     * 解封用户（管理员）
+     * <p>
+     * 管理员将指定用户从封禁状态（status=0）恢复为正常状态（status=1），
+     * 解封后该用户可以正常登录系统。
+     * <p>
+     * <b>权限要求：</b>
+     * <ul>
+     *     <li>用户必须已登录</li>
+     *     <li>用户必须具有管理员角色（role=2）</li>
+     * </ul>
+     * <p>
+     * <b>校验规则：</b>
+     * <ul>
+     *     <li>目标用户必须存在</li>
+     *     <li>目标用户不能是已注销用户</li>
+     *     <li>目标用户必须处于封禁状态（status=0）</li>
+     * </ul>
+     *
+     * @param targetUserId 需要解封的目标用户ID
+     * @return Result 解封结果，成功返回空数据
+     */
+    @PutMapping("/unban")
+    @SaCheckLogin
+    @SaCheckRole("admin")
+    public Result<Void> unBan(@RequestParam Long targetUserId){
+        return  authService.unBan(targetUserId);
     }
 }

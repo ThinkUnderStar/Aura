@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import thinkunderstar.aura.aurabackendserver.common.Result;
+import thinkunderstar.aura.aurabackendserver.dto.request.BanUserDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.LoginDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.RegisterAdminDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.RegisterUserDto;
@@ -25,7 +26,6 @@ import thinkunderstar.aura.aurabackendserver.mapper.WorkspaceMapper;
 import thinkunderstar.aura.aurabackendserver.mapper.WorkspaceMemberMapper;
 import thinkunderstar.aura.aurabackendserver.service.core.AuthService;
 import thinkunderstar.aura.aurabackendserver.service.core.SysKnowledgeBaseService;
-import thinkunderstar.aura.aurabackendserver.service.wrapper.KnowledgeBaseService;
 import thinkunderstar.aura.aurabackendserver.service.wrapper.UserService;
 import thinkunderstar.aura.aurabackendserver.util.*;
 
@@ -45,7 +45,6 @@ public class AuthServiceImpl implements AuthService {
     private final WorkspaceMapper workspaceMapper;
     private final WorkspaceMemberMapper workspaceMemberMapper;
     private final KnowledgeBaseMapper knowledgeBaseMapper;
-    private final KnowledgeBaseService knowledgeBaseService;
     private final SysKnowledgeBaseService sysKnowledgeBaseService;
     private final TransactionTemplate transactionTemplate;
 
@@ -54,7 +53,12 @@ public class AuthServiceImpl implements AuthService {
             HttpServletRequest httpServletRequest,
             UserService userService,
             RedisUtils redisUtils,
-            WorkspaceMapper workspaceMapper, WorkspaceMemberMapper workspaceMemberMapper, KnowledgeBaseMapper knowledgeBaseMapper, KnowledgeBaseService knowledgeBaseService, SysKnowledgeBaseService sysKnowledgeBaseService, TransactionTemplate transactionTemplate) {
+            WorkspaceMapper workspaceMapper,
+            WorkspaceMemberMapper workspaceMemberMapper,
+            KnowledgeBaseMapper knowledgeBaseMapper,
+            SysKnowledgeBaseService sysKnowledgeBaseService,
+            TransactionTemplate transactionTemplate
+    ) {
         this.redisTokenBucketLimiter = redisTokenBucketLimiter;
         this.httpServletRequest = httpServletRequest;
         this.userService = userService;
@@ -62,7 +66,6 @@ public class AuthServiceImpl implements AuthService {
         this.workspaceMapper = workspaceMapper;
         this.workspaceMemberMapper = workspaceMemberMapper;
         this.knowledgeBaseMapper = knowledgeBaseMapper;
-        this.knowledgeBaseService = knowledgeBaseService;
         this.sysKnowledgeBaseService = sysKnowledgeBaseService;
         this.transactionTemplate = transactionTemplate;
     }
@@ -488,6 +491,134 @@ public class AuthServiceImpl implements AuthService {
         user.setStatus(1);
 
         userService.save(user);
+        return Result.success();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Result<Void> ban(BanUserDto banUserDto) {
+        if (
+                banUserDto == null
+                        || banUserDto.getTargetUserId() == null
+                        || banUserDto.getType() == null
+        ) {
+            throw new BusinessException("封禁用户接口的参数接收异常");
+        }
+
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (!redisTokenBucketLimiter.tryAcquireByUser(String.valueOf(loginId), 5, 1)) {
+            throw new BusinessException("封禁用户过于频繁，请稍后再试");
+        }
+
+        User targetUser = userService.getById(banUserDto.getTargetUserId());
+        if (targetUser == null || targetUser.getDeleted() == 1) {
+            throw new BusinessException("未查询到该用户");
+        }
+
+        if (banUserDto.getType() == 1){ //封禁该用户
+            return banUser(loginId, targetUser,banUserDto.getBanReason(),banUserDto.getBanTime());
+        } else if (banUserDto.getType() == 2) { //延长封禁时间
+            return extendBanTime(loginId,targetUser,banUserDto.getBanReason(),banUserDto.getBanTime());
+        }else {
+            throw new BusinessException("封禁用户接口的类型参数异常");
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Result<Void> unBan(Long targetUserId) {
+        if (targetUserId == null) {
+            throw new BusinessException("解封用户接口的参数接收异常");
+        }
+
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (!redisTokenBucketLimiter.tryAcquireByUser(String.valueOf(loginId), 5, 1)) {
+            throw new BusinessException("解封用户过于频繁请稍后再试");
+        }
+
+        User targetUser = userService.getById(targetUserId);
+        if (targetUser == null || targetUser.getDeleted() == 1) {
+            throw new BusinessException("未查询到该用户");
+        }
+
+        if (targetUser.getRole() == 2 || targetUserId.equals(StpUtil.getLoginIdAsLong())) {
+            throw new BusinessException("管理员不能作为该接口的目标");
+        }
+
+        if (targetUser.getStatus() == 1){
+            throw new BusinessException("该用户的账户并没有被封禁");
+        }
+
+        unBanUser(targetUser);
+
+        return Result.success();
+    }
+
+    //延长封禁时间
+    private Result<Void> extendBanTime(long adminId, User targetUser, String banReason, Long banTime) {
+        if (targetUser.getStatus() != 0){
+            throw new BusinessException("该用户并没有被封禁");
+        }
+
+        if (banTime == null || banTime <= 0){
+            throw new BusinessException("延长天数至少为1天");
+        }
+
+        if (targetUser.getId() == adminId || targetUser.getRole() == 2){
+            throw new BusinessException("管理员账号被封禁");
+        }
+
+        if (banReason != null && !banReason.isEmpty()) {
+            targetUser.setBanReason(banReason);
+        }
+
+        targetUser.setBanBy(adminId);
+        LocalDateTime banEndTime = targetUser.getBanEndTime();
+        if (banEndTime == null) {
+            throw new BusinessException("该用户已被永久封禁");
+        }
+        targetUser.setBanEndTime(banEndTime.plusDays(banTime));
+
+        userService.updateById(targetUser);
+
+        return Result.success();
+    }
+
+    //封禁目标用户
+    private Result<Void> banUser(
+            long adminId,
+            User targetUser,
+            String banReason,
+            Long banTime
+    ) {//banTime: null为永久封禁
+        if (targetUser.getStatus() == 0){
+            throw new BusinessException("该用户已被封禁");
+        }
+
+        if (targetUser.getId() == adminId){
+            throw new BusinessException("不能封禁自己");
+        }
+
+        if (targetUser.getRole() == 2){
+            throw new BusinessException("该用户为管理员，无法封禁");
+        }
+
+        if (banReason == null || banReason.isEmpty()) {
+            throw new BusinessException("封禁原因不能为空");
+        }
+
+        targetUser.setBanBy(adminId);
+        targetUser.setBanReason(banReason);
+        targetUser.setBanStartTime(LocalDateTime.now());
+        if (banTime == null){
+            targetUser.setBanEndTime(null);
+        }else {
+            targetUser.setBanEndTime(LocalDateTime.now().plusDays(banTime));
+        }
+        targetUser.setStatus(0);
+
+        userService.updateById(targetUser);
+
         return Result.success();
     }
 }
