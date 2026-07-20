@@ -8,19 +8,24 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import thinkunderstar.aura.aurabackendserver.common.Result;
 import thinkunderstar.aura.aurabackendserver.dto.request.LoginDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.RegisterAdminDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.RegisterUserDto;
 import thinkunderstar.aura.aurabackendserver.dto.response.UserVODto;
+import thinkunderstar.aura.aurabackendserver.entity.KnowledgeBase;
 import thinkunderstar.aura.aurabackendserver.entity.User;
 import thinkunderstar.aura.aurabackendserver.entity.Workspace;
 import thinkunderstar.aura.aurabackendserver.entity.WorkspaceMember;
 import thinkunderstar.aura.aurabackendserver.exception.AuthException;
 import thinkunderstar.aura.aurabackendserver.exception.BusinessException;
+import thinkunderstar.aura.aurabackendserver.mapper.KnowledgeBaseMapper;
 import thinkunderstar.aura.aurabackendserver.mapper.WorkspaceMapper;
 import thinkunderstar.aura.aurabackendserver.mapper.WorkspaceMemberMapper;
 import thinkunderstar.aura.aurabackendserver.service.core.AuthService;
+import thinkunderstar.aura.aurabackendserver.service.core.SysKnowledgeBaseService;
+import thinkunderstar.aura.aurabackendserver.service.wrapper.KnowledgeBaseService;
 import thinkunderstar.aura.aurabackendserver.service.wrapper.UserService;
 import thinkunderstar.aura.aurabackendserver.util.*;
 
@@ -39,19 +44,27 @@ public class AuthServiceImpl implements AuthService {
     private final RedisUtils redisUtils;
     private final WorkspaceMapper workspaceMapper;
     private final WorkspaceMemberMapper workspaceMemberMapper;
+    private final KnowledgeBaseMapper knowledgeBaseMapper;
+    private final KnowledgeBaseService knowledgeBaseService;
+    private final SysKnowledgeBaseService sysKnowledgeBaseService;
+    private final TransactionTemplate transactionTemplate;
 
     public AuthServiceImpl(
             RedisTokenBucketLimiter redisTokenBucketLimiter,
             HttpServletRequest httpServletRequest,
             UserService userService,
             RedisUtils redisUtils,
-            WorkspaceMapper workspaceMapper, WorkspaceMemberMapper workspaceMemberMapper) {
+            WorkspaceMapper workspaceMapper, WorkspaceMemberMapper workspaceMemberMapper, KnowledgeBaseMapper knowledgeBaseMapper, KnowledgeBaseService knowledgeBaseService, SysKnowledgeBaseService sysKnowledgeBaseService, TransactionTemplate transactionTemplate) {
         this.redisTokenBucketLimiter = redisTokenBucketLimiter;
         this.httpServletRequest = httpServletRequest;
         this.userService = userService;
         this.redisUtils = redisUtils;
         this.workspaceMapper = workspaceMapper;
         this.workspaceMemberMapper = workspaceMemberMapper;
+        this.knowledgeBaseMapper = knowledgeBaseMapper;
+        this.knowledgeBaseService = knowledgeBaseService;
+        this.sysKnowledgeBaseService = sysKnowledgeBaseService;
+        this.transactionTemplate = transactionTemplate;
     }
 
     @Override
@@ -351,6 +364,24 @@ public class AuthServiceImpl implements AuthService {
                 log.warn("旧用户:"+user.getId()+"头像文件删除失败");
             }
         }
+
+        //删除该账号绑定的所有数据库
+        knowledgeBaseMapper.selectList(
+                new LambdaQueryWrapper<KnowledgeBase>()
+                        .eq(KnowledgeBase::getOwnerId,user.getId())
+        ).forEach(knowledgeBase -> {
+            try {
+                transactionTemplate.execute(status -> {
+                    sysKnowledgeBaseService.forceDeleteKnowledgeBase(Math.toIntExact(knowledgeBase.getId()));
+                    return null;
+                });
+            }catch (Exception e){
+                log.error("知识库: "+knowledgeBase.getId()+" 删除失败");
+            }
+        });
+
+        //删除该账户帮的agent记忆
+        log.warn("接口未实现");
 
         userService.removeById(user.getId());
     }

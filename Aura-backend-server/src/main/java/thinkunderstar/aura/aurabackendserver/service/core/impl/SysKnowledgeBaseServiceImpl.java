@@ -280,7 +280,8 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
             throw new BusinessException("未查询到该知识库");
         }
 
-        if (knowledgeBase.getOwnerId() != StpUtil.getLoginIdAsLong()) {
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (knowledgeBase.getOwnerId() != loginId && userService.getById(loginId).getRole() != 2) {
             throw new BusinessException("您没有权限删除该知识库");
         }
 
@@ -310,7 +311,8 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
             throw new BusinessException("未查询到该知识库");
         }
 
-        if (knowledgeBase.getOwnerId() != StpUtil.getLoginIdAsLong()) {
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (knowledgeBase.getOwnerId() != loginId && userService.getById(loginId).getRole() != 2) {
             throw new BusinessException("您没有权限强制删除该知识库");
         }
 
@@ -337,19 +339,16 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
         KnowledgeBase knowledgeBase = knowledgeBaseService.getById(id);
 
         if (knowledgeBase == null) {
-            throw new BusinessException("数据库可能已被彻底删除");
+            throw new BusinessException("该知识库可能已被彻底删除");
         }
 
-        if (knowledgeBase.getOwnerId() != StpUtil.getLoginIdAsLong()) {
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (knowledgeBase.getOwnerId() != loginId && userService.getById(loginId).getRole() != 2) {
             throw new BusinessException("您没有权限恢复该知识库");
         }
 
         if (knowledgeBase.getStatus() == 1) {
             throw new BusinessException("该数据库并没有被删除");
-        }
-
-        if (knowledgeBase.getIsTeam() == 1) {
-            throw new BusinessException("团队数据库无法恢复");
         }
 
         //恢复知识库的业务代码

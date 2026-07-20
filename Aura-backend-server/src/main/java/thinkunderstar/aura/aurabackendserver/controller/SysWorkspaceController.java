@@ -1,6 +1,7 @@
 package thinkunderstar.aura.aurabackendserver.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.annotation.SaCheckRole;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -221,5 +222,60 @@ public class SysWorkspaceController {
         return  sysWorkspaceService.resetInviteCode(workspaceId);
     }
 
-    //封禁团队接口
+    /**
+     * 封禁团队（管理员）
+     * <p>
+     * 管理员将指定团队置为封禁状态（status=2），封禁后：
+     * <ul>
+     *     <li>所有成员（包括管理员和创建者）无法访问该团队的文档和知识库</li>
+     *     <li>该团队不再出现在团队列表中（需手动过滤）</li>
+     *     <li>已封禁的团队无法上传文档、发起对话或修改信息</li>
+     *     <li>封禁操作不会删除任何数据，保留完整的审计和证据</li>
+     * </ul>
+     * <p>
+     * <b>权限要求：</b>
+     * <ul>
+     *     <li>用户必须已登录</li>
+     *     <li>用户必须具有管理员角色（role=2）</li>
+     * </ul>
+     *
+     * @param workspaceId 需要封禁的团队ID
+     * @return Result 封禁操作结果，成功返回空数据
+     */
+    @DeleteMapping("/ban")
+    @SaCheckLogin
+    @SaCheckRole("admin")
+    public Result<List<WorkspaceOperationLog>> banWorkspace(@RequestParam Long workspaceId){
+        return   sysWorkspaceService.banWorkspace(workspaceId);
+    }
+
+    /**
+     * 解封团队并恢复关联知识库
+     * <p>
+     * 管理员解除指定团队的封禁状态，同时恢复其关联的知识库，
+     * 解封后团队及其知识库恢复正常可用状态。
+     * <p>
+     * <b>权限要求：</b>用户必须已登录且具备管理员角色（role=2）
+     * <p>
+     * <b>操作效果：</b>
+     * <ul>
+     *     <li>团队状态：封禁（status=2）→ 正常（status=1）</li>
+     *     <li>关联知识库状态：封禁（status=2）→ 正常（status=1）</li>
+     *     <li>恢复后团队所有功能可正常使用</li>
+     *     <li>团队成员可正常访问知识库</li>
+     * </ul>
+     *
+     * @param workspaceId 需要解封的团队ID
+     * @param kbId 需要解封的知识库ID
+     * @return Result 解封结果，成功返回空数据
+     */
+    @PutMapping("/unban")
+    @SaCheckLogin
+    @SaCheckRole("admin")
+    public Result<Void> unbanWorkspace(
+            @RequestParam Long workspaceId,
+            @RequestParam Long kbId
+    ){
+        return   sysWorkspaceService.unbanWorkspace(workspaceId, kbId);
+    }
 }

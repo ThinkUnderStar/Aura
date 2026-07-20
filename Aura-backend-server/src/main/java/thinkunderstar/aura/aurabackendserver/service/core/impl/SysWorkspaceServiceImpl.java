@@ -26,10 +26,7 @@ import thinkunderstar.aura.aurabackendserver.mapper.WorkspaceMemberMapper;
 import thinkunderstar.aura.aurabackendserver.mapper.WorkspaceOperationLogMapper;
 import thinkunderstar.aura.aurabackendserver.service.core.SysKnowledgeBaseService;
 import thinkunderstar.aura.aurabackendserver.service.core.SysWorkspaceService;
-import thinkunderstar.aura.aurabackendserver.service.wrapper.UserService;
-import thinkunderstar.aura.aurabackendserver.service.wrapper.WorkspaceMemberService;
-import thinkunderstar.aura.aurabackendserver.service.wrapper.WorkspaceOperationLogService;
-import thinkunderstar.aura.aurabackendserver.service.wrapper.WorkspaceService;
+import thinkunderstar.aura.aurabackendserver.service.wrapper.*;
 import thinkunderstar.aura.aurabackendserver.util.CodeUtils;
 import thinkunderstar.aura.aurabackendserver.util.RedisTokenBucketLimiter;
 
@@ -54,6 +51,7 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
     private final WorkspaceOperationLogService workspaceOperationLogService;
     private final TransactionTemplate transactionTemplate;
     private final WorkspaceOperationLogMapper workspaceOperationLogMapper;
+    private final KnowledgeBaseService knowledgeBaseService;
 
     public SysWorkspaceServiceImpl(
             WorkspaceMapper workspaceMapper,
@@ -61,7 +59,7 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
             WorkspaceService workspaceService,
             SysKnowledgeBaseService sysKnowledgeBaseService,
             WorkspaceMemberService workspaceMemberService,
-            WorkspaceMemberMapper workspaceMemberMapper, UserService userService, WorkspaceOperationLogService workspaceOperationLogService, TransactionTemplate transactionTemplate, WorkspaceOperationLogMapper workspaceOperationLogMapper) {
+            WorkspaceMemberMapper workspaceMemberMapper, UserService userService, WorkspaceOperationLogService workspaceOperationLogService, TransactionTemplate transactionTemplate, WorkspaceOperationLogMapper workspaceOperationLogMapper, KnowledgeBaseService knowledgeBaseService) {
         this.workspaceMapper = workspaceMapper;
         this.redisTokenBucketLimiter = redisTokenBucketLimiter;
         this.workspaceService = workspaceService;
@@ -72,6 +70,7 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
         this.workspaceOperationLogService = workspaceOperationLogService;
         this.transactionTemplate = transactionTemplate;
         this.workspaceOperationLogMapper = workspaceOperationLogMapper;
+        this.knowledgeBaseService = knowledgeBaseService;
     }
 
     @Override
@@ -184,6 +183,11 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
         //绑定团队知识库(考虑到事务回滚无法回滚Milvus数据库的创建操作，将Milvus数据库的创建放在了最后)
         workspace.setKbId(result.getData().getId());
         workspaceService.updateById(workspace);
+        workspaceOperationLog.setRequestSummary(
+                workspaceOperationLog.getRequestSummary()
+                +"知识库ID为: "
+                + workspace.getKbId()
+        );
 
         return Result.success(workspaceVODto);
     }
@@ -225,7 +229,7 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
         }
 
         Workspace workspace = workspaceService.getById(workspaceId);
-        if (workspace == null) {
+        if (workspace == null || workspace.getStatus() != 1) {
             throw new BusinessException("该团队不存在");
         }
 
@@ -298,7 +302,7 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
 
         Workspace workspace = workspaceService.getById(updateWorkspaceDto.getWorkspaceId());
 
-        if (workspace == null || workspace.getStatus() == 0) {
+        if (workspace == null || workspace.getStatus() != 1) {
             throw new BusinessException("该团队不存在");
         }
 
@@ -372,7 +376,7 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
 
         Workspace workspace = workspaceService.getById(workspaceId);
 
-        if (workspace == null || workspace.getStatus() == 0) {
+        if (workspace == null || workspace.getStatus() != 1) {
             throw new BusinessException("未查询到该团队");
         }
 
@@ -447,7 +451,7 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
             throw new BusinessException("你未加入该团队");
         }
 
-        if (workspace.getStatus() == 0 || member.getStatus() == 0){
+        if (workspace.getStatus() == 0 || member.getStatus() != 1){
             workspaceMemberService.removeById(member.getId());
         }else {
             throw new BusinessException("请调用退队接口");
@@ -469,7 +473,7 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
         }
 
         Workspace workspace = workspaceService.getById(workspaceId);
-        if (workspace == null || workspace.getStatus() == 0) {
+        if (workspace == null || workspace.getStatus() != 1) {
             throw new BusinessException("未查询到该团队");
         }
 
@@ -492,6 +496,101 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
         workspaceService.updateById(workspace);
 
         return Result.success(newInviteCode);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Result<List<WorkspaceOperationLog>> banWorkspace(Long workspaceId) {
+        if (workspaceId == null) {
+            throw new BusinessException("封禁团队接口的参数接收异常");
+        }
+
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (!redisTokenBucketLimiter.tryAcquireByUser(String.valueOf(loginId),5,1)){
+            throw new BusinessException("封禁团队过于频繁，请稍后再试");
+        }
+
+        Workspace workspace = workspaceService.getById(workspaceId);
+        if (workspace == null || workspace.getStatus() != 1) {
+            throw new BusinessException("未查询到该团队");
+        }
+
+        //添加一条日志
+        String username = userService.getById(loginId).getUsername();
+        WorkspaceOperationLog workspaceOperationLog = new WorkspaceOperationLog();
+        workspaceOperationLog.setWorkspaceId(workspace.getId());
+        workspaceOperationLog.setUsername(username);
+        workspaceOperationLog.setUserId(loginId);
+        workspaceOperationLog.setModule("workspace");
+        workspaceOperationLog.setOperation("delete");
+        workspaceOperationLog.setRequestSummary("管理员: "+username+" 封禁了该团队");
+        workspaceOperationLog.setStatus(1);
+        workspaceOperationLogService.save(workspaceOperationLog);
+
+        //获取全部日志
+        List<WorkspaceOperationLog> workspaceOperationLogs = workspaceOperationLogMapper.selectList(
+                new LambdaQueryWrapper<WorkspaceOperationLog>()
+                        .eq(WorkspaceOperationLog::getWorkspaceId, workspace.getId())
+                        .orderByDesc(WorkspaceOperationLog::getCreateTime)
+        );
+
+        //封禁团队业务代码
+        workspace.setStatus(2);
+        //删除绑定的知识库
+        Long kbId = workspace.getKbId();
+        if (kbId != null) {
+            sysKnowledgeBaseService.logicDeleteKnowledgeBase(Math.toIntExact(kbId));
+            workspace.setKbId(null);
+        }
+        workspaceService.updateById(workspace);
+
+        return Result.success(workspaceOperationLogs);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Result<Void> unbanWorkspace(Long workspaceId, Long kbId) {
+        if (workspaceId == null || kbId == null) {
+            throw new BusinessException("解封团队接口参数接收异常");
+        }
+
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (!redisTokenBucketLimiter.tryAcquireByUser(String.valueOf(loginId),5,1)){
+            throw new BusinessException("解封团队过于频繁，请稍后再试");
+        }
+
+        Workspace workspace = workspaceService.getById(workspaceId);
+        if (workspace == null || workspace.getStatus() == 0) {
+            throw new BusinessException("未查询到该团队");
+        }
+
+        if (workspace.getStatus() == 1){
+            throw new BusinessException("该团队未被封禁");
+        }
+
+        KnowledgeBase knowledgeBase = knowledgeBaseService.getById(kbId);
+        if (knowledgeBase == null) {
+            throw new BusinessException("该知识库已被彻底清除");
+        }
+
+        sysKnowledgeBaseService.restoreKnowledgeBase(Math.toIntExact(kbId));
+        workspace.setKbId(kbId);
+        workspace.setStatus(1);
+        workspaceService.updateById(workspace);
+
+        //添加一条日志
+        String username = userService.getById(loginId).getUsername();
+        WorkspaceOperationLog workspaceOperationLog = new WorkspaceOperationLog();
+        workspaceOperationLog.setWorkspaceId(workspace.getId());
+        workspaceOperationLog.setUsername(username);
+        workspaceOperationLog.setUserId(loginId);
+        workspaceOperationLog.setModule("workspace");
+        workspaceOperationLog.setOperation("update");
+        workspaceOperationLog.setRequestSummary("管理员: "+username+" 解封了该团队");
+        workspaceOperationLog.setStatus(1);
+        workspaceOperationLogService.save(workspaceOperationLog);
+
+        return Result.success();
     }
 
     private Result<WorkspaceVODto> updateWorkspaceDescription(Workspace workspace, String description) {
@@ -577,6 +676,8 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
         workspaceMapper.selectList(
                 new LambdaQueryWrapper<Workspace>()
                         .eq(Workspace::getStatus, 0)
+                        .or()
+                        .eq(Workspace::getStatus, 2)
         ).stream()
                 .map(Workspace::getId)
                 .forEach(workspaceId -> {
@@ -586,6 +687,17 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
                     );
 
                     if (count == 0) {
+                        Workspace workspace = workspaceService.getById(workspaceId);
+                        //删除团队的logo图片
+                        if (workspace.getLogo() != null && !workspace.getLogo().isEmpty()) {
+                            String oldLogo = "./docs"+workspace.getLogo();
+                            try {
+                                Files.deleteIfExists(Path.of(oldLogo));
+                            } catch (IOException e) {
+                                log.warn("团队:"+ workspaceId +"的旧logo文件删除失败");
+                            }
+                        }
+
                         try {
                             transactionTemplate.execute(status -> {
                                 workspaceService.removeById(workspaceId);

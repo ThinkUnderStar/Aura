@@ -71,7 +71,7 @@ public class SysWorkspaceMemberServiceImpl implements SysWorkspaceMemberService 
         }
 
         Workspace workspace = workspaceService.getById(workspaceId);
-        if (workspace == null || workspace.getStatus() == 0) {
+        if (workspace == null || workspace.getStatus() != 1) {
             throw new BusinessException("未查询到该团队");
         }
 
@@ -82,7 +82,7 @@ public class SysWorkspaceMemberServiceImpl implements SysWorkspaceMemberService 
                         .eq(WorkspaceMember::getUserId, loginId)
         );
 
-        if (member == null) {
+        if (member == null && userService.getById(loginId).getRole() != 2) {
             throw new BusinessException("您无权获取该团队的所有成员信息");
         }
 
@@ -145,7 +145,7 @@ public class SysWorkspaceMemberServiceImpl implements SysWorkspaceMemberService 
                         .eq(Workspace::getInviteCode, inviteCode)
         );
 
-        if (workspace == null || workspace.getStatus() == 0) {
+        if (workspace == null || workspace.getStatus() != 1) {
             throw new BusinessException("邀请码失效");
         }
 
@@ -213,7 +213,7 @@ public class SysWorkspaceMemberServiceImpl implements SysWorkspaceMemberService 
         }
 
         Workspace workspace = workspaceService.getById(workspaceId);
-        if (workspace == null || workspace.getStatus() == 0) {
+        if (workspace == null || workspace.getStatus() != 1) {
             throw new BusinessException("未查询到该团队");
         }
 
@@ -266,7 +266,7 @@ public class SysWorkspaceMemberServiceImpl implements SysWorkspaceMemberService 
         }
 
         Workspace workspace = workspaceService.getById(workspaceId);
-        if (workspace == null || workspace.getStatus() == 0) {
+        if (workspace == null || workspace.getStatus() != 1) {
             throw new BusinessException("未查询到该团队");
         }
 
@@ -342,7 +342,7 @@ public class SysWorkspaceMemberServiceImpl implements SysWorkspaceMemberService 
 
         Workspace workspace = workspaceService.getById(setRoleDto.getWorkspaceId());
 
-        if (workspace == null || workspace.getStatus() == 0) {
+        if (workspace == null || workspace.getStatus() != 1) {
             throw new BusinessException("未查询到该团队");
         }
 
@@ -481,7 +481,7 @@ public class SysWorkspaceMemberServiceImpl implements SysWorkspaceMemberService 
         }
 
         Workspace workspace = workspaceService.getById(workspaceId);
-        if (workspace == null || workspace.getStatus() == 0) {
+        if (workspace == null || workspace.getStatus() != 1) {
             throw new BusinessException("未查询到该团队");
         }
 

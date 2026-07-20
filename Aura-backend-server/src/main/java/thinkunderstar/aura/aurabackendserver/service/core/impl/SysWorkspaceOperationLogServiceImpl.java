@@ -11,6 +11,7 @@ import thinkunderstar.aura.aurabackendserver.entity.WorkspaceOperationLog;
 import thinkunderstar.aura.aurabackendserver.exception.BusinessException;
 import thinkunderstar.aura.aurabackendserver.mapper.WorkspaceOperationLogMapper;
 import thinkunderstar.aura.aurabackendserver.service.core.SysWorkspaceOperationLogService;
+import thinkunderstar.aura.aurabackendserver.service.wrapper.UserService;
 import thinkunderstar.aura.aurabackendserver.service.wrapper.WorkspaceMemberService;
 import thinkunderstar.aura.aurabackendserver.service.wrapper.WorkspaceService;
 import thinkunderstar.aura.aurabackendserver.util.RedisTokenBucketLimiter;
@@ -21,12 +22,14 @@ public class SysWorkspaceOperationLogServiceImpl implements SysWorkspaceOperatio
     private final WorkspaceService workspaceService;
     private final WorkspaceMemberService workspaceMemberService;
     private final WorkspaceOperationLogMapper workspaceOperationLogMapper;
+    private final UserService userService;
 
-    public SysWorkspaceOperationLogServiceImpl(RedisTokenBucketLimiter redisTokenBucketLimiter, WorkspaceService workspaceService, WorkspaceMemberService workspaceMemberService, WorkspaceOperationLogMapper workspaceOperationLogMapper) {
+    public SysWorkspaceOperationLogServiceImpl(RedisTokenBucketLimiter redisTokenBucketLimiter, WorkspaceService workspaceService, WorkspaceMemberService workspaceMemberService, WorkspaceOperationLogMapper workspaceOperationLogMapper, UserService userService) {
         this.redisTokenBucketLimiter = redisTokenBucketLimiter;
         this.workspaceService = workspaceService;
         this.workspaceMemberService = workspaceMemberService;
         this.workspaceOperationLogMapper = workspaceOperationLogMapper;
+        this.userService = userService;
     }
 
     @Override
@@ -54,7 +57,7 @@ public class SysWorkspaceOperationLogServiceImpl implements SysWorkspaceOperatio
         }
 
         Workspace workspace = workspaceService.getById(workspaceId);
-        if (workspace == null || workspace.getStatus() == 0) {
+        if (workspace == null || workspace.getStatus() != 1) {
             throw new BusinessException("未查询到该团队");
         }
 
@@ -65,7 +68,7 @@ public class SysWorkspaceOperationLogServiceImpl implements SysWorkspaceOperatio
                         .eq(WorkspaceMember::getUserId, loginId)
         );
 
-        if (member == null || member.getRole() == 2) {
+        if ((member == null || member.getRole() == 2) && userService.getById(loginId).getRole() != 2) {
             throw new BusinessException("您无权查找该团队的日志");
         }
 
