@@ -358,6 +358,44 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
         return Result.success(knowledgeBase);
     }
 
+    @Override
+    public Result<Page<KnowledgeBase>> searchMyKnowledgeBase(String keyword, Long page, Long pageSize) {
+        if (keyword == null || page == null || pageSize == null) {
+            throw new BusinessException("搜索相关知识库接口的参数接收异常");
+        }
+
+        // 限制 page
+        if (page < 1) {
+            page = 1L;
+        }
+
+        // 限制 size
+        if (pageSize < 1) {
+            pageSize = 20L;
+        }
+        if (pageSize > 100) {
+            pageSize = 100L;
+        }
+
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (!redisTokenBucketLimiter.tryAcquireByUser(String.valueOf(loginId),5,1)){
+            throw new BusinessException("搜索相关知识库过于频繁，请稍后再试");
+        }
+
+        Page<KnowledgeBase> knowledgeBasePage = new Page<>(page, pageSize);
+        Page<KnowledgeBase> resultPage = knowledgeBaseMapper.selectPage(
+                knowledgeBasePage,
+                new LambdaQueryWrapper<KnowledgeBase>()
+                        .eq(KnowledgeBase::getOwnerId, loginId)
+                        .eq(KnowledgeBase::getIsTeam,0)
+                        .eq(KnowledgeBase::getStatus, 1)
+                        .like(KnowledgeBase::getName, keyword)
+                        .orderByDesc(KnowledgeBase::getUpdateTime)
+        );
+
+        return Result.success(resultPage);
+    }
+
     private Result<KnowledgeBase> updateKnowledgeBaseName(String name , KnowledgeBase knowledgeBase) {
         if (name == null || name.isEmpty()){
             throw new BusinessException("知识库的名字不能为空");

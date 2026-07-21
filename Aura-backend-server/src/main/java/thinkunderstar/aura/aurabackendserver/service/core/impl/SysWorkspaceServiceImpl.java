@@ -593,6 +593,105 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
         return Result.success();
     }
 
+    @Override
+    public Result<IPage<Workspace>> getAllWorkspaces(Long page, Long size) {
+        if (page == null || size == null) {
+            throw new BusinessException("获取所有团队信息接口的参数接收异常");
+        }
+
+        // 限制 page
+        if (page < 1) {
+            page = 1L;
+        }
+
+        // 限制 size
+        if (size < 1) {
+            size = 20L;
+        }
+        if (size > 100) {
+            size = 100L;
+        }
+
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (!redisTokenBucketLimiter.tryAcquireByUser(String.valueOf(loginId),10,2)){
+            throw new BusinessException("获取所有团队信息接口调用过于频繁，请稍后再试");
+        }
+
+        Page<Workspace> workspacePage = new Page<>(page, size);
+        Page<Workspace> resultPage = workspaceMapper.selectPage(
+                workspacePage,
+                new LambdaQueryWrapper<Workspace>()
+                        .eq(Workspace::getStatus, 1)
+                        .orderByDesc(Workspace::getCreateTime)
+        );
+
+        return Result.success(resultPage);
+    }
+
+    @Override
+    public Result<IPage<WorkspaceVODto>> searchMyWorkspaces(String keyWord, Long page, Long size) {
+        if (page == null || size == null || keyWord == null) {
+            throw new BusinessException("搜索相关团队接口的参数接收异常");
+        }
+
+        if (page < 1) {
+            page = 1L;
+        }
+
+        if (size < 1) {
+            size = 20L;
+        }
+
+        if (size > 100) {
+            size = 100L;
+        }
+
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (!redisTokenBucketLimiter.tryAcquireByUser(String.valueOf(loginId),5,1)){
+            throw new BusinessException("搜索相关团队过于频繁，请稍后再试");
+        }
+
+        Page<WorkspaceVODto> resultPage = new Page<>(page, size);
+        IPage<WorkspaceVODto> workspaceVODtoIPage = workspaceMapper.searchUserWorkspacesByKeyword(resultPage, loginId, keyWord);
+
+        return Result.success(workspaceVODtoIPage);
+    }
+
+    @Override
+    public Result<Page<Workspace>> searchAllMyWorkspaces(String keyWord, Long page, Long size) {
+        if (page == null || size == null || keyWord == null) {
+            throw new BusinessException("搜索所有相关团队接口的参数接收异常");
+        }
+
+        if (page < 1) {
+            page = 1L;
+        }
+
+        if (size < 1) {
+            size = 20L;
+        }
+
+        if (size > 100) {
+            size = 100L;
+        }
+
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (!redisTokenBucketLimiter.tryAcquireByUser(String.valueOf(loginId),10,2)){
+            throw new BusinessException("搜索所有相关团队过于频繁，请稍后再试");
+        }
+
+        Page<Workspace>  workspacePage = new Page<>(page, size);
+        Page<Workspace> resultPage = workspaceMapper.selectPage(
+                workspacePage,
+                new LambdaQueryWrapper<Workspace>()
+                        .eq(Workspace::getStatus, 1)
+                        .like(Workspace::getName, keyWord)
+                        .orderByDesc(Workspace::getCreateTime)
+        );
+
+        return Result.success(resultPage);
+    }
+
     private Result<WorkspaceVODto> updateWorkspaceDescription(Workspace workspace, String description) {
         Integer role = StpUtil.getLoginIdAsLong() == workspace.getOwnerId() ? 0 : 1;
         WorkspaceVODto workspaceVODto = new WorkspaceVODto();
@@ -672,7 +771,7 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
      * 定时清除没有任何成员遗留的团队信息
      */
     @Scheduled(cron = "0 * * * * ?")
-    private void cleanDeletedWorkspaceInformation(){
+    public void cleanDeletedWorkspaceInformation(){
         workspaceMapper.selectList(
                 new LambdaQueryWrapper<Workspace>()
                         .eq(Workspace::getStatus, 0)

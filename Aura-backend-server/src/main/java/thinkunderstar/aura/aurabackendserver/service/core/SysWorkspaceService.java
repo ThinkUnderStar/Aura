@@ -2,12 +2,14 @@ package thinkunderstar.aura.aurabackendserver.service.core;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 import thinkunderstar.aura.aurabackendserver.common.Result;
 import thinkunderstar.aura.aurabackendserver.dto.request.UpdateWorkspaceDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.WorkspaceDto;
 import thinkunderstar.aura.aurabackendserver.dto.response.WorkspaceVODto;
+import thinkunderstar.aura.aurabackendserver.entity.Workspace;
 import thinkunderstar.aura.aurabackendserver.entity.WorkspaceOperationLog;
 
 import java.util.List;
@@ -217,4 +219,84 @@ public interface SysWorkspaceService {
      * @return Result 解封结果，成功返回空数据
      */
     Result<Void> unbanWorkspace(Long workspaceId, Long kbId);
+
+    /**
+     * 管理员分页查询所有团队
+     * <p>
+     * 管理员查看系统中的所有团队。
+     * 支持按状态过滤，按创建时间倒序排列。
+     * <p>
+     * <b>权限要求：</b>
+     * <ul>
+     *     <li>用户必须已登录</li>
+     *     <li>用户必须具有管理员角色（role=2）</li>
+     * </ul>
+     *
+     * @param page 当前页码，从1开始，默认1
+     * @param size 每页记录数，默认20
+     * @return Result 分页团队数据，直接返回 Workspace 实体列表
+     */
+    Result<IPage<Workspace>> getAllWorkspaces(Long page, Long size);
+
+    /**
+     * 模糊搜索当前用户可访问的团队（分页）
+     * <p>
+     * 根据关键词在当前用户已加入的团队范围内进行模糊匹配。
+     * <b>搜索范围：</b>仅匹配团队的 <b>名称（name）</b> 字段，采用前后模糊匹配（%keyword%）。
+     * <p>
+     * <b>适用场景：</b>
+     * <ul>
+     *     <li>Agent 绑定知识库时，用户需要从下拉列表中选择目标团队</li>
+     *     <li>用户快速定位自己所在的某个团队</li>
+     * </ul>
+     * <p>
+     * <b>查询范围约束：</b>
+     * <ul>
+     *     <li>仅返回当前用户已加入的团队（通过 workspace_members 表关联）</li>
+     *     <li>仅返回正常状态的团队（status = 1），已解散或被封禁的团队不会出现</li>
+     *     <li>按创建时间倒序排列（最新的在前）</li>
+     * </ul>
+     * <p>
+     * <b>注意：</b>该接口返回的是完整的团队信息（WorkspaceVODto），包含当前用户在团队中的角色（role）和成员状态（memberStatus），
+     * 便于前端在绑定 Agent 时判断用户是否具有操作权限。
+     *
+     * @param keyWord 搜索关键词（不能为空，前后模糊匹配）
+     * @param page    当前页码，从1开始，默认1
+     * @param size    每页记录数，默认20，最大限制100
+     * @return Result 包含分页团队数据的响应，每项包含团队ID、名称、描述、Logo、邀请码、角色、成员状态等
+     */
+    Result<IPage<WorkspaceVODto>>  searchMyWorkspaces(String keyWord, Long page, Long size);
+
+    /**
+     * 【管理员】全局搜索所有正常状态的团队（分页）
+     * <p>
+     * 管理员通过团队名称模糊搜索系统中所有 <b>正常状态（status = 1）</b> 的团队。
+     * 与普通用户搜索接口（/search）不同，本接口不限制当前用户的成员关系，
+     * 直接返回所有匹配的团队实体。
+     * <p>
+     * <b>过滤规则：</b>
+     * <ul>
+     *     <li>仅返回 status = 1（正常）的团队</li>
+     *     <li>已解散（status = 0）和被封禁（status = 2）的团队不会出现</li>
+     *     <li>按创建时间倒序排列（最新的在前）</li>
+     * </ul>
+     * <p>
+     * <b>权限要求：</b>
+     * <ul>
+     *     <li>用户必须已登录</li>
+     *     <li>用户必须具有管理员角色（role=2）</li>
+     * </ul>
+     * <p>
+     * <b>使用场景：</b>
+     * <ul>
+     *     <li>管理后台下拉框/搜索框快速定位正常团队</li>
+     *     <li>管理员对正常团队进行信息查询或管理操作</li>
+     * </ul>
+     *
+     * @param keyWord 搜索关键词（不能为空，匹配团队名称）
+     * @param page    当前页码，从1开始，默认1
+     * @param size    每页记录数，默认20，最大100
+     * @return Result 分页团队数据（Workspace 实体列表）
+     */
+    Result<Page<Workspace>>  searchAllMyWorkspaces(String keyWord, Long page, Long size);
 }

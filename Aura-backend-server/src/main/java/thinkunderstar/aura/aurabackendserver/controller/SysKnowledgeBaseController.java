@@ -196,4 +196,41 @@ public class SysKnowledgeBaseController {
     public Result<KnowledgeBase> restoreKnowledgeBase(@RequestParam Integer id){
         return sysKnowledgeBaseService.restoreKnowledgeBase(id);
     }
+
+    /**
+     * 模糊搜索个人知识库（分页）
+     * <p>
+     * 根据关键词在当前登录用户的个人知识库范围内进行模糊匹配。
+     * <b>搜索范围：</b>仅匹配知识库的 <b>名称（name）</b> 字段，采用前后模糊匹配（%keyword%）。
+     * <p>
+     * <b>适用范围：</b>
+     * <ul>
+     *     <li>仅查询当前用户创建的个人知识库（is_team = 0）</li>
+     *     <li>仅返回正常状态（status = 1）的知识库，已停用的不会出现</li>
+     *     <li>按创建时间倒序排列（最新的在前）</li>
+     * </ul>
+     * <p>
+     * <b>使用场景：</b>用户通过名称快速定位特定知识库，如输入“技术”匹配“技术文档库”。
+     * <p>
+     * <b>性能提示：</b>
+     * <ul>
+     *     <li>建议在数据库表 knowledge_bases 的 name 字段上建立普通索引</li>
+     *     <li>由于使用 %keyword% 前后模糊匹配，传统 B-Tree 索引在大数据量下可能失效</li>
+     *     <li>单用户知识库数量通常有限（百级以内），当前实现足以满足；若未来扩展至万级，可考虑引入 Elasticsearch 或改用前缀匹配</li>
+     * </ul>
+     *
+     * @param keyword  搜索关键词（不能为空，空字符串会抛出业务异常）
+     * @param page     当前页码，从1开始，默认1
+     * @param pageSize 每页记录数，默认20，最大限制100
+     * @return Result 包含分页知识库数据的响应
+     */
+    @GetMapping("/search")
+    @SaCheckLogin
+    public Result<Page<KnowledgeBase>> searchMyKnowledgeBase(
+            @RequestParam String keyword,
+            @RequestParam(defaultValue = "1") Long page,
+            @RequestParam(defaultValue = "20") Long pageSize
+    ){
+        return sysKnowledgeBaseService.searchMyKnowledgeBase(keyword,page,pageSize);
+    }
 }
