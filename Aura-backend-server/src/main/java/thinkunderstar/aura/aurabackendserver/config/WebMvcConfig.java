@@ -9,7 +9,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
     //资源路径映射
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        registry.addResourceHandler("/uploads/**")
-                .addResourceLocations("file:./docs/");
+        registry.addResourceHandler("/uploads/avatars/**")
+                .addResourceLocations("file:./docs/avatars/");
+
+        registry.addResourceHandler("/uploads/workspace_logos/**")
+                .addResourceLocations("file:./docs/workspace_logos/");
     }
 }

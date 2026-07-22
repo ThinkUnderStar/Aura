@@ -8,6 +8,19 @@ public class ValidateUtils {
     private static final String PASSWORD_REGEX = "^(?![0-9]+$)(?![a-zA-Z]+$)[0-9A-Za-z!@#$%^&*_\\-]{8,20}$";
     private static final String PHONE_REGEX = "^1[3-9]\\d{9}$";
     private static final String EMAIL_REGEX = "^[a-zA-Z0-9_.-]+@[a-zA-Z0-9-]+(\\.[a-zA-Z0-9]+)*\\.[a-zA-Z0-9]{2,6}$";
+    private static final String AGENT_NAME_REGEX = "^[\\u4e00-\\u9fa5a-zA-Z0-9_\\-\\s]{1,20}$";
+
+    /**
+     * Agent 名称规范验证
+     * 长度：1 ~ 20 位
+     * 允许：中文、字母、数字、空格、下划线、连字符
+     * 不能为空，不能纯空格
+     * @param name Agent 名称
+     * @return 验证结果
+     */
+    public static boolean agentNameValidate(String name){
+        return name != null && !name.trim().isEmpty() && name.matches(AGENT_NAME_REGEX);
+    }
 
     /**
      * 用户名规范验证

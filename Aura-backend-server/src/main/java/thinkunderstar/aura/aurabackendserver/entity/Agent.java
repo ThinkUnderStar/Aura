@@ -2,7 +2,6 @@ package thinkunderstar.aura.aurabackendserver.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -17,7 +16,7 @@ public class Agent {
     private String name;
 
     /**
-     * 1-活跃 0-已归档
+     * 1-活跃 0-已归档 (暂未用到，先滞留)
      */
     private Integer status;
 
@@ -29,8 +28,7 @@ public class Agent {
 
     public Agent() {}
 
-    public Agent(Long id, Long userId, String name) {
-        this.id = id;
+    public Agent(Long userId, String name) {
         this.userId = userId;
         this.name = name;
         this.status = 1;

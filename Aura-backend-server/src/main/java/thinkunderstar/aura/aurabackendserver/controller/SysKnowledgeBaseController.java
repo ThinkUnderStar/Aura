@@ -1,6 +1,7 @@
 package thinkunderstar.aura.aurabackendserver.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.annotation.SaCheckRole;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.web.bind.annotation.*;
 import thinkunderstar.aura.aurabackendserver.common.Result;
@@ -51,6 +52,34 @@ public class SysKnowledgeBaseController {
             @RequestParam(defaultValue = "20") Integer pageSize
     ){
         return sysKnowledgeBaseService.getMyKnowledgeBases(page,pageSize);
+    }
+
+    /**
+     * 获取指定团队绑定的知识库详情
+     * <p>
+     * 根据团队ID查询该团队当前绑定的知识库完整信息。
+     * 用于团队首页展示知识库概况、Agent 绑定知识库时确认绑定对象等场景。
+     * <p>
+     * <b>权限要求：</b>
+     * <ul>
+     *     <li>用户必须已登录</li>
+     *     <li>用户必须是该团队的成员（status=1），或者是管理员（role=2）</li>
+     * </ul>
+     * <p>
+     * <b>返回数据：</b>
+     * <ul>
+     *     <li>知识库完整信息（KnowledgeBase），包含ID、名称、描述、文档数量、创建时间等</li>
+     *     <li>若团队未绑定知识库（kbId为null），返回错误提示</li>
+     *     <li>若绑定的知识库已被删除或停用，返回错误提示</li>
+     * </ul>
+     *
+     * @param workspaceId 团队ID（路径参数）
+     * @return Result 知识库详情
+     */
+    @GetMapping("/get/{workspaceId}")
+    @SaCheckLogin
+    public Result<KnowledgeBase> getTeamKnowledgeBases(@PathVariable Long workspaceId){
+        return sysKnowledgeBaseService.getTeamKnowledgeBases(workspaceId);
     }
 
     /**

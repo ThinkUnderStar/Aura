@@ -17,10 +17,7 @@ import thinkunderstar.aura.aurabackendserver.mapper.AgentKbBindingMapper;
 import thinkunderstar.aura.aurabackendserver.mapper.KnowledgeBaseMapper;
 import thinkunderstar.aura.aurabackendserver.mapper.WorkspaceMemberMapper;
 import thinkunderstar.aura.aurabackendserver.service.core.SysKnowledgeBaseService;
-import thinkunderstar.aura.aurabackendserver.service.wrapper.KnowledgeBaseService;
-import thinkunderstar.aura.aurabackendserver.service.wrapper.UserService;
-import thinkunderstar.aura.aurabackendserver.service.wrapper.WorkspaceOperationLogService;
-import thinkunderstar.aura.aurabackendserver.service.wrapper.WorkspaceService;
+import thinkunderstar.aura.aurabackendserver.service.wrapper.*;
 import thinkunderstar.aura.aurabackendserver.util.RedisTokenBucketLimiter;
 
 import java.time.LocalDateTime;
@@ -40,6 +37,7 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
     private final TransactionTemplate transactionTemplate;
     private final UserService userService;
     private final WorkspaceOperationLogService workspaceOperationLogService;
+    private final WorkspaceMemberService workspaceMemberService;
 
     public SysKnowledgeBaseServiceImpl(
             KnowledgeBaseService knowledgeBaseService,
@@ -48,7 +46,7 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
             WorkspaceMemberMapper workspaceMemberMapper,
             RedisTokenBucketLimiter redisTokenBucketLimiter,
             AgentKbBindingMapper agentKbBindingMapper,
-            TransactionTemplate transactionTemplate, UserService userService, WorkspaceOperationLogService workspaceOperationLogService) {
+            TransactionTemplate transactionTemplate, UserService userService, WorkspaceOperationLogService workspaceOperationLogService, WorkspaceMemberService workspaceMemberService) {
         this.knowledgeBaseService = knowledgeBaseService;
         this.knowledgeBaseMapper = knowledgeBaseMapper;
         this.workspaceService = workspaceService;
@@ -58,6 +56,7 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
         this.transactionTemplate = transactionTemplate;
         this.userService = userService;
         this.workspaceOperationLogService = workspaceOperationLogService;
+        this.workspaceMemberService = workspaceMemberService;
     }
 
     @Override
@@ -124,6 +123,54 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
         Page<KnowledgeBase> result = knowledgeBaseMapper.selectPage(knowledgeBasePage, queryWrapper);
 
         return Result.success(result);
+    }
+
+    @Override
+    public Result<KnowledgeBase> getTeamKnowledgeBases(Long workspaceId) {
+        if (workspaceId == null || workspaceId < 1) {
+            throw new BusinessException("获取指定团队知识库信息接口的参数接收异常");
+        }
+
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (!redisTokenBucketLimiter.tryAcquireByUser(String.valueOf(loginId),10,2)){
+            throw new BusinessException("获取指定团队知识库信息过于频繁，请稍后再试");
+        }
+
+        Workspace workspace = workspaceService.getById(workspaceId);
+        if (workspace == null || workspace.getStatus() != 1) {
+            throw new BusinessException("未查询到该团队");
+        }
+
+        //管理员跳过该检查逻辑
+        User user = userService.getById(loginId);
+        //检查是否有权限
+        if ( user.getRole() != 2) {
+            WorkspaceMember member = workspaceMemberService.getOne(
+                    new LambdaQueryWrapper<WorkspaceMember>()
+                            .eq(WorkspaceMember::getWorkspaceId, workspaceId)
+                            .eq(WorkspaceMember::getUserId, loginId)
+                            .eq(WorkspaceMember::getStatus, 1)
+            );
+
+            if (member == null) {
+                throw new BusinessException("您没有权限查询该团队的知识库信息");
+            }
+        }
+
+        KnowledgeBase knowledgeBase = knowledgeBaseService.getById(workspace.getKbId());
+        if (knowledgeBase == null) {
+            throw new BusinessException("该知识库可能已被彻底删除");
+        }
+
+        if (knowledgeBase.getIsTeam() == 0) {
+            throw new BusinessException("该知识库为私人知识库");
+        }
+
+        if (knowledgeBase.getStatus() != 1){
+            throw new BusinessException("该知识库已被停用");
+        }
+
+        return Result.success(knowledgeBase);
     }
 
     @Override
