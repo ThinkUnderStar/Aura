@@ -26,5 +26,5 @@ public interface SysUserService {
      * @param file 上传的头像文件（multipart/form-data）
      * @return Result 上传结果，成功时返回头像访问路径
      */
-    Result<Void> avatar(MultipartFile file);
+    Result<String> avatar(MultipartFile file);
 }

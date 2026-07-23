@@ -43,7 +43,7 @@ public class SysUserController {
      */
     @PutMapping("/avatar")
     @SaCheckLogin
-    public Result<Void> avatar(@RequestParam("file") MultipartFile file){
+    public Result<String> avatar(@RequestParam("file") MultipartFile file){
         return sysUserService.avatar(file);
     }
 }

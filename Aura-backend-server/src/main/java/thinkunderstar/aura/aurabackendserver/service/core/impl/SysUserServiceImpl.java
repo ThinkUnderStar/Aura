@@ -106,7 +106,7 @@ public class SysUserServiceImpl implements SysUserService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Result<Void> avatar(MultipartFile file) {
+    public Result<String> avatar(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new BusinessException("上传的头像文件为空");
         }
@@ -157,7 +157,7 @@ public class SysUserServiceImpl implements SysUserService {
 
         user.setAvatar(avatar);
         userService.updateById(user);
-        return Result.success();
+        return Result.success(avatar);
     }
 
     //修改用户的昵称
