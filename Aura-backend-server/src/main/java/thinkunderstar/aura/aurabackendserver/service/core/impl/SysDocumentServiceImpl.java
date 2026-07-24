@@ -4,6 +4,10 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -17,6 +21,8 @@ import thinkunderstar.aura.aurabackendserver.util.RedisTokenBucketLimiter;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Slf4j
@@ -202,39 +208,7 @@ public class SysDocumentServiceImpl implements SysDocumentService {
         }
 
         //鉴权模块
-        KnowledgeBase knowledgeBase = knowledgeBaseService.getById(kbId);
-        if (knowledgeBase == null || knowledgeBase.getStatus() == 0) {
-            throw new BusinessException("未查询到该知识库");
-        }
-
-        if (knowledgeBase.getIsTeam() == 0){
-            if (loginId != knowledgeBase.getOwnerId()){
-                throw new BusinessException("你无权获取该知识库中的相关文件信息");
-            }
-        }else if (knowledgeBase.getIsTeam() == 1) {
-            Workspace workspace = workspaceService.getOne(
-                    new LambdaQueryWrapper<Workspace>()
-                            .eq(Workspace::getKbId, knowledgeBase.getId())
-                            .eq(Workspace::getStatus, 1)
-            );
-
-            if (workspace == null) {
-                throw new BusinessException("该团队可能已被解散或封禁");
-            }
-
-            WorkspaceMember member = workspaceMemberService.getOne(
-                    new LambdaQueryWrapper<WorkspaceMember>()
-                            .eq(WorkspaceMember::getWorkspaceId, workspace.getId())
-                            .eq(WorkspaceMember::getUserId, loginId)
-                            .eq(WorkspaceMember::getStatus, 1)
-            );
-
-            if (member == null) {
-                throw new BusinessException("你无权获取该知识库中的相关文件信息");
-            }
-        }else {
-            throw new BusinessException("该知识库的团队指向异常");
-        }
+        authentication(kbId, loginId);
 
         //获取该知识库相关文件信息的业务代码
         Page<Document> documentPage = new Page<>(page, size);
@@ -339,5 +313,85 @@ public class SysDocumentServiceImpl implements SysDocumentService {
         log.warn("调用python端的接口，删除milvus中的相关数据");
 
         return Result.success();
+    }
+
+    @Override
+    public ResponseEntity<Resource> getDocumentContent(Long documentId, String disposition) {
+        if (documentId == null || disposition == null) {
+            throw new BusinessException("获取文件内容接口的参数接收异常");
+        }
+
+        if(!disposition.equals("inline") && !disposition.equals("attachment")) {
+            throw new BusinessException("获取文件内容接口的获取形式参数异常");
+        }
+
+        //限流模块
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (!redisTokenBucketLimiter.tryAcquireByUser(String.valueOf(loginId),10,2)){
+            throw new BusinessException("获取文件内容过于频繁，请稍后再试");
+        }
+
+        //鉴权模块
+        Document document = documentService.getById(documentId);
+        if (document == null) {
+            throw new BusinessException("未查询带该文件");
+        }
+        
+        Long kbId = document.getKbId();
+        authentication(kbId, loginId);
+
+        //获取该文件内容的业务代码
+        File file = new File("./docs"+document.getFilePath());
+
+        if (!file.exists()) {
+            throw new BusinessException("该文件不存在");
+        }
+
+        Resource resource = new FileSystemResource(file);
+        //设置请求头
+        String encodedFileName = URLEncoder.encode(document.getFileName(), StandardCharsets.UTF_8)
+                .replace("+", "%20");
+        String contentDisposition = disposition + "; filename=\"" + encodedFileName + "\"";
+
+        return ResponseEntity
+                .ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition)
+                .body(resource);
+    }
+
+    private void authentication(Long kbId, long loginId) {
+        KnowledgeBase knowledgeBase = knowledgeBaseService.getById(kbId);
+        if (knowledgeBase == null || knowledgeBase.getStatus() == 0) {
+            throw new BusinessException("未查询到该知识库");
+        }
+
+        if (knowledgeBase.getIsTeam() == 0){ 
+            if (loginId != knowledgeBase.getOwnerId()){
+                throw new BusinessException("你无权获取该知识库中的相关文件信息");
+            }
+        }else if (knowledgeBase.getIsTeam() == 1) {
+            Workspace workspace = workspaceService.getOne(
+                    new LambdaQueryWrapper<Workspace>()
+                            .eq(Workspace::getKbId, knowledgeBase.getId())
+                            .eq(Workspace::getStatus, 1)
+            );
+
+            if (workspace == null) {
+                throw new BusinessException("该团队可能已被解散或封禁");
+            }
+
+            WorkspaceMember member = workspaceMemberService.getOne(
+                    new LambdaQueryWrapper<WorkspaceMember>()
+                            .eq(WorkspaceMember::getWorkspaceId, workspace.getId())
+                            .eq(WorkspaceMember::getUserId, loginId)
+                            .eq(WorkspaceMember::getStatus, 1)
+            );
+
+            if (member == null) {
+                throw new BusinessException("你无权获取该知识库中的相关文件信息");
+            }
+        }else {
+            throw new BusinessException("该知识库的团队指向异常");
+        }
     }
 }

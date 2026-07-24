@@ -2,6 +2,8 @@ package thinkunderstar.aura.aurabackendserver.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import org.springframework.core.io.Resource;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import thinkunderstar.aura.aurabackendserver.common.Result;
@@ -128,5 +130,47 @@ public class SysDocumentController {
     @SaCheckLogin
     public Result<Void> deleteDocument(@RequestParam Long documentId) {
         return  sysDocumentService.deleteDocument(documentId);
+    }
+
+    /**
+     * 下载文档（带权限校验和流式输出）
+     * <p>
+     * 根据文档 ID 从本地磁盘读取文件并以二进制流形式返回给客户端。
+     * 通过 disposition 参数控制浏览器行为：inline（在线预览）或 attachment（强制下载）。
+     * <p>
+     * <b>处理流程：</b>
+     * <ol>
+     *     <li>校验文档存在</li>
+     *     <li>校验当前用户对文档所在知识库的访问权限</li>
+     *     <li>从磁盘读取文件并包装为 Resource</li>
+     *     <li>设置响应头（Content-Disposition、Content-Type）</li>
+     *     <li>返回文件流</li>
+     * </ol>
+     * <p>
+     * <b>权限要求：</b>
+     * <ul>
+     *     <li>用户必须已登录</li>
+     *     <li>个人知识库：仅所有者可下载</li>
+     *     <li>团队知识库：所有正常成员（status=1）可下载</li>
+     * </ul>
+     * <p>
+     * <b>响应头说明：</b>
+     * <ul>
+     *     <li>Content-Disposition: 由 disposition 参数控制（inline 预览 / attachment 下载）</li>
+     *     <li>Content-Type: application/octet-stream（通用二进制流）</li>
+     *     <li>文件名使用 URL 编码，避免中文乱码</li>
+     * </ul>
+     *
+     * @param documentId  文档 ID（必填）
+     * @param disposition 响应方式，可选值：inline（在线预览，默认）或 attachment（强制下载）
+     * @return ResponseEntity 包含文件字节流和响应头
+     */
+    @GetMapping("/content")
+    @SaCheckLogin
+    public ResponseEntity<Resource> getDocumentContent(
+            @RequestParam Long documentId,
+            @RequestParam(defaultValue = "inline") String disposition
+    ) {
+        return sysDocumentService.getDocumentContent(documentId, disposition);
     }
 }
