@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="1829a85c-8193-4763-a8fd-f016cc1e1b05" name="更改" comment="">
+      <change afterPath="$PROJECT_DIR$/app/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/api/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/api/v1/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/core/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/core/config.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/db/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/db/entities.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/db/session.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/models/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/models/request.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/models/response.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/services/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/Aura-backend-ai.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/Aura-backend-ai.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
+  </component>
+  <component name="ProjectColorInfo"><![CDATA[{
+  "customColor": "",
+  "associatedIndex": 3
+}]]></component>
+  <component name="ProjectId" id="3GzMIJYOZgiVhxWCP3tcNKe5nRG" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ASKED_MARK_IGNORED_FILES_AS_EXCLUDED": "true",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "Python.main.executor": "Coverage",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "codeWithMe.voiceChat.enabledByDefault": "false",
+    "git-widget-placeholder": "master",
+    "last_opened_file_path": "C:/Users/jiang/Desktop/勿动/Aura/Aura-backend-ai",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="C:\Users\jiang\Desktop\勿动\Aura\Aura-backend-ai" />
+    </key>
+  </component>
+  <component name="RunManager">
+    <configuration name="aura" type="Python.FastAPI">
+      <option name="file" value="C:\Users\jiang\Desktop\勿动\Aura\Aura-backend-ai\main.py" />
+      <module name="Aura-backend-ai" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="$PROJECT_DIR$/.venv/Scripts/python.exe" />
+      <option name="SDK_NAME" value="Python 3.12 (Aura-backend-ai)" />
+      <option name="WORKING_DIRECTORY" value="" />
+      <option name="IS_MODULE_SDK" value="false" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="DEBUG_JUST_MY_CODE" value="false" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="RUN_TOOL" value="" />
+      <option name="launchJavascriptDebuger" value="false" />
+      <method v="2" />
+    </configuration>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-js-predefined-d6986cc7102b-3bd3a6803838-JavaScript-PY-261.22158.340" />
+        <option value="bundled-python-sdk-b63d5a1f7c97-b61e75351b1f-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-261.22158.340" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="默认任务">
+      <changelist id="1829a85c-8193-4763-a8fd-f016cc1e1b05" name="更改" comment="" />
+      <created>1784969862560</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1784969862560</updated>
+      <workItem from="1784969863608" duration="6206000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+</project>
