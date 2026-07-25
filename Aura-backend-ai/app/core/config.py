@@ -1,6 +1,4 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import List
-
 
 class Settings(BaseSettings):
     """应用配置类，自动从 .env 文件和环境变量加载配置"""
@@ -10,7 +8,7 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = True
     HOST: str = "0.0.0.0"
-    PORT: int = 8000
+    PORT: int = 8002
 
     # ==================== MySQL 数据库配置 ====================
     MYSQL_HOST: str = "localhost"
