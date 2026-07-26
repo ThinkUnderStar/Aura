@@ -1,3 +1,5 @@
+from urllib.parse import quote_plus
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -19,11 +21,16 @@ class Settings(BaseSettings):
 
     @property
     def MYSQL_URL(self) -> str:
-        """构建 MySQL 连接 URL"""
+        encoded_pwd = quote_plus(self.MYSQL_PASSWORD)
         return (
-            f"mysql+pymysql://{self.MYSQL_USER}:{self.MYSQL_PASSWORD}"
+            f"mysql+asyncmy://{self.MYSQL_USER}:{encoded_pwd}"
             f"@{self.MYSQL_HOST}:{self.MYSQL_PORT}/{self.MYSQL_DATABASE}?charset=utf8mb4"
         )
+
+    # ==================== Milvus 配置 ====================
+    MILVUS_URI: str = "http://localhost:19530"
+    MILVUS_TOKEN: str = "root:Milvus"  # 本地默认认证
+    MILVUS_DB_NAME: str = "default"  # 默认数据库
 
     # ==================== Pydantic 配置加载规则 ====================
     model_config = SettingsConfigDict(

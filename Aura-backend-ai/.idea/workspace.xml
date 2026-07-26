@@ -2,10 +2,20 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="1829a85c-8193-4763-a8fd-f016cc1e1b05" name="更改" comment="">
+      <change afterPath="$PROJECT_DIR$/app/api/v1/router.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/db/milvus/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/db/milvus/client.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/db/mysql/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/db/mysql/entities.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/db/mysql/session.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/Aura-backend-ai.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/Aura-backend-ai.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/core/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/core/config.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/db/session.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/db/session.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/db/entities.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/v1/knowledge_base.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/db/session.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/models/response.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/models/response.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -22,10 +32,10 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "customColor": "",
-  "associatedIndex": 3
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
+  &quot;associatedIndex&quot;: 3
+}</component>
   <component name="ProjectId" id="3GzMIJYOZgiVhxWCP3tcNKe5nRG" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
@@ -43,12 +53,16 @@
     "codeWithMe.voiceChat.enabledByDefault": "false",
     "git-widget-placeholder": "master",
     "last_opened_file_path": "C:/Users/jiang/Desktop/勿动/Aura/Aura-backend-ai",
+    "settings.editor.selected.configurable": "cosy.settings.plugin",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="C:\Users\jiang\Desktop\勿动\Aura\Aura-backend-ai" />
+    </key>
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\jiang\Desktop\勿动\Aura\Aura-backend-ai\app\db\mysql" />
     </key>
   </component>
   <component name="RunManager">
@@ -87,6 +101,7 @@
       <option name="presentableId" value="Default" />
       <updated>1784969862560</updated>
       <workItem from="1784969863608" duration="9305000" />
+      <workItem from="1785049865827" duration="11915000" />
     </task>
     <servers />
   </component>
