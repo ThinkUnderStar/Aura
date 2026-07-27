@@ -2,19 +2,20 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="1829a85c-8193-4763-a8fd-f016cc1e1b05" name="更改" comment="">
-      <change afterPath="$PROJECT_DIR$/app/api/v1/router.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/app/db/milvus/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/app/db/milvus/client.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/app/db/mysql/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/app/db/mysql/entities.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/app/db/mysql/session.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/Aura-backend-ai.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/Aura-backend-ai.iml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/api/v1/document_router.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/api/v1/knowledge_base_router.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/core/llm.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/services/rag/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/services/rag/document_processor.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/services/rag/embedding.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/services/v1/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/services/v1/document_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/services/v1/knowledge_base_service.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/api/v1/knowledge_base.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/api/v1/router.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/v1/router.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/core/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/core/config.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/db/entities.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/v1/knowledge_base.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/db/session.py" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/app/models/response.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/models/response.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -41,27 +42,28 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ASKED_MARK_IGNORED_FILES_AS_EXCLUDED": "true",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "Python.main.executor": "Coverage",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "codeWithMe.voiceChat.enabledByDefault": "false",
-    "git-widget-placeholder": "master",
-    "last_opened_file_path": "C:/Users/jiang/Desktop/勿动/Aura/Aura-backend-ai",
-    "settings.editor.selected.configurable": "cosy.settings.plugin",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ASKED_MARK_IGNORED_FILES_AS_EXCLUDED&quot;: &quot;true&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python.main.executor&quot;: &quot;Coverage&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/jiang/Desktop/勿动/Aura/Aura-backend-ai&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;cosy.settings.plugin&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="C:\Users\jiang\Desktop\勿动\Aura\Aura-backend-ai" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\jiang\Desktop\勿动\Aura\Aura-backend-ai\app\services\v1" />
       <recent name="C:\Users\jiang\Desktop\勿动\Aura\Aura-backend-ai\app\db\mysql" />
     </key>
   </component>
@@ -102,6 +104,7 @@
       <updated>1784969862560</updated>
       <workItem from="1784969863608" duration="9305000" />
       <workItem from="1785049865827" duration="11915000" />
+      <workItem from="1785144495985" duration="12988000" />
     </task>
     <servers />
   </component>

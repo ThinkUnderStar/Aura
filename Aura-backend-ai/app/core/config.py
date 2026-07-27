@@ -31,6 +31,13 @@ class Settings(BaseSettings):
     MILVUS_URI: str = "http://localhost:19530"
     MILVUS_TOKEN: str = "root:Milvus"  # 本地默认认证
     MILVUS_DB_NAME: str = "default"  # 默认数据库
+    MILVUS_DIMENSION: int = 2560  # 默认向量维度
+
+    # ==================== RAG 配置 ====================
+    DOCUMENT_ROOT: str = "../Aura-backend-server/docs"
+    SPLIT_CHUNK_SIZE: int = 512  # 每块最大字符数
+    SPLIT_CHUNK_OVERLAP: int = 64  # 相邻两块重叠字符数
+    EMBEDDING_MODEL: str #暂时只支持ollama本地部署的模型
 
     # ==================== Pydantic 配置加载规则 ====================
     model_config = SettingsConfigDict(
