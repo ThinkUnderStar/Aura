@@ -2,21 +2,12 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="1829a85c-8193-4763-a8fd-f016cc1e1b05" name="更改" comment="">
-      <change afterPath="$PROJECT_DIR$/app/api/v1/document_router.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/app/api/v1/knowledge_base_router.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/app/core/llm.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/app/services/rag/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/app/services/rag/document_processor.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/app/services/rag/embedding.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/app/services/v1/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/app/services/v1/document_service.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/app/services/v1/knowledge_base_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/services/rag/vector_store.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/api/v1/knowledge_base.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/api/v1/router.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/v1/router.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/core/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/core/config.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/models/response.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/models/response.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/api/v1/document_router.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/v1/document_router.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/db/milvus/client.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/db/milvus/client.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/services/rag/embedding.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/rag/embedding.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/services/v1/document_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/v1/document_service.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -32,6 +23,9 @@
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
+  </component>
+  <component name="HighlightingSettingsPerFile">
+    <setting file="file://$PROJECT_DIR$/app/services/rag/embedding.py" root0="FORCE_HIGHLIGHTING" />
   </component>
   <component name="ProjectColorInfo">{
   &quot;customColor&quot;: &quot;&quot;,
@@ -105,6 +99,7 @@
       <workItem from="1784969863608" duration="9305000" />
       <workItem from="1785049865827" duration="11915000" />
       <workItem from="1785144495985" duration="12988000" />
+      <workItem from="1785238988600" duration="7437000" />
     </task>
     <servers />
   </component>
