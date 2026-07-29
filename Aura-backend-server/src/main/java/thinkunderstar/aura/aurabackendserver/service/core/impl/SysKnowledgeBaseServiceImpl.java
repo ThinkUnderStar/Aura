@@ -8,6 +8,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 import thinkunderstar.aura.aurabackendserver.common.Result;
 import thinkunderstar.aura.aurabackendserver.dto.request.CreateKnowledgeBaseDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.UpdateKnowledgeBaseDto;
@@ -38,6 +40,7 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
     private final UserService userService;
     private final WorkspaceOperationLogService workspaceOperationLogService;
     private final WorkspaceMemberService workspaceMemberService;
+    private final WebClient webClient;
 
     public SysKnowledgeBaseServiceImpl(
             KnowledgeBaseService knowledgeBaseService,
@@ -46,7 +49,7 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
             WorkspaceMemberMapper workspaceMemberMapper,
             RedisTokenBucketLimiter redisTokenBucketLimiter,
             AgentKbBindingMapper agentKbBindingMapper,
-            TransactionTemplate transactionTemplate, UserService userService, WorkspaceOperationLogService workspaceOperationLogService, WorkspaceMemberService workspaceMemberService) {
+            TransactionTemplate transactionTemplate, UserService userService, WorkspaceOperationLogService workspaceOperationLogService, WorkspaceMemberService workspaceMemberService, WebClient webClient) {
         this.knowledgeBaseService = knowledgeBaseService;
         this.knowledgeBaseMapper = knowledgeBaseMapper;
         this.workspaceService = workspaceService;
@@ -57,6 +60,7 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
         this.userService = userService;
         this.workspaceOperationLogService = workspaceOperationLogService;
         this.workspaceMemberService = workspaceMemberService;
+        this.webClient = webClient;
     }
 
     @Override
@@ -91,7 +95,18 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
         knowledgeBaseService.save(knowledgeBase);
 
         //调用python接口创建milvus向量数据库
-        log.warn("python接口创建milvus数据库业务未实现");
+        Result result = webClient.post()
+                .uri(uriBuilder ->
+                        uriBuilder
+                                .path("/api/v1/kb/create/{kb_name}")
+                                .build(knowledgeBase.getCollectionName())
+                ).retrieve()
+                .bodyToMono(Result.class)
+                .block();
+
+        if (result == null || result.getCode() != 200) {
+            throw new BusinessException("创建知识库失败");
+        }
 
         return Result.success(knowledgeBase);
     }
@@ -365,8 +380,19 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
 
         //删除mysql中存储的数据
         knowledgeBaseService.removeById(id);
+
         //调用python端接口删除
-        log.warn("python端删除知识库的接口未完成");
+        Result result = webClient.delete()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/api/v1/kb/delete/{kb_name}")
+                        .build(knowledgeBase.getCollectionName())
+                ).retrieve()
+                .bodyToMono(Result.class)
+                .block();
+
+        if (result == null || result.getCode() != 200) {
+            throw new BusinessException("删除该知识库失败");
+        }
 
         return Result.success();
     }

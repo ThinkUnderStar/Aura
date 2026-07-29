@@ -15,6 +15,7 @@ async def upload_document(
 ) -> Result[None]:
     """
     上传文档到指定知识库
+    :param db: mysql数据库会话
     :param kb_id:  知识库id
     :param doc_id:  文档id
     :return: 上传结果

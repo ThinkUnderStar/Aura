@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.reactive.function.client.WebClient;
 import thinkunderstar.aura.aurabackendserver.common.Result;
 import thinkunderstar.aura.aurabackendserver.entity.*;
 import thinkunderstar.aura.aurabackendserver.exception.BusinessException;
@@ -37,8 +38,9 @@ public class SysDocumentServiceImpl implements SysDocumentService {
     private final UserService userService;
     private final WorkspaceOperationLogService workspaceOperationLogService;
     private final DocumentMapper documentMapper;
+    private final WebClient webClient;
 
-    public SysDocumentServiceImpl(RedisTokenBucketLimiter redisTokenBucketLimiter, KnowledgeBaseService knowledgeBaseService, WorkspaceService workspaceService, WorkspaceMemberService workspaceMemberService, DocumentService documentService, UserService userService, WorkspaceOperationLogService workspaceOperationLogService, DocumentMapper documentMapper) {
+    public SysDocumentServiceImpl(RedisTokenBucketLimiter redisTokenBucketLimiter, KnowledgeBaseService knowledgeBaseService, WorkspaceService workspaceService, WorkspaceMemberService workspaceMemberService, DocumentService documentService, UserService userService, WorkspaceOperationLogService workspaceOperationLogService, DocumentMapper documentMapper, WebClient webClient) {
         this.redisTokenBucketLimiter = redisTokenBucketLimiter;
         this.knowledgeBaseService = knowledgeBaseService;
         this.workspaceService = workspaceService;
@@ -47,6 +49,7 @@ public class SysDocumentServiceImpl implements SysDocumentService {
         this.userService = userService;
         this.workspaceOperationLogService = workspaceOperationLogService;
         this.documentMapper = documentMapper;
+        this.webClient = webClient;
     }
 
     @Override
@@ -175,7 +178,20 @@ public class SysDocumentServiceImpl implements SysDocumentService {
             throw new BusinessException("文件上传失败");
         }
 
-        log.warn("调用python端的接口，检索该文件");
+        //调用python端的服务接口上传文档到知识库中
+        Result result = webClient.post()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/api/v1/document/upload")
+                        .queryParam("kb_id", kbId)
+                        .queryParam("doc_id", document.getId())
+                        .build()
+                ).retrieve()
+                .bodyToMono(Result.class)
+                .block();
+
+        if (result == null || result.getCode() != 200) {
+            throw new BusinessException("文档上传失败");
+        }
 
         //设置字段检索完成
         document.setStatus(1);
@@ -309,8 +325,20 @@ public class SysDocumentServiceImpl implements SysDocumentService {
             }
         }
 
-        //删除milvus中的数据
-        log.warn("调用python端的接口，删除milvus中的相关数据");
+        //调用python服务端的接口删除milvus中的数据
+        Result result = webClient.delete()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/api/v1/document/delete")
+                        .queryParam("kb_id", knowledgeBase.getId())
+                        .queryParam("doc_id", document.getId())
+                        .build()
+                ).retrieve()
+                .bodyToMono(Result.class)
+                .block();
+
+        if (result == null || result.getCode() != 200) {
+            throw new BusinessException("从知识库中删除该文档失败");
+        }
 
         return Result.success();
     }
