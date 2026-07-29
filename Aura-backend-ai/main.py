@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-
+import app.core.logging
 from app.api.v1.router import api_v1_router
 from app.db.mysql.session import Base, async_engine
 

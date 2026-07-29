@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     # ==================== Milvus 配置 ====================
     MILVUS_URI: str = "http://localhost:19530"
     MILVUS_TOKEN: str = "root:Milvus"  # 本地默认认证
-    MILVUS_DB_NAME: str = "default"  # 默认数据库
+    MILVUS_DB_NAME: str = "aura"  # 默认数据库
     MILVUS_DIMENSION: int = 2560  # 默认向量维度
 
     # ==================== RAG 配置 ====================

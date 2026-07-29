@@ -13,3 +13,4 @@ pydantic-settings>=2.10.1,<3.0.0
 asyncmy==0.2.11
 langchain_text_splitters==1.1.2
 langchain-classic==1.0.8
+cryptography==49.0.0
