@@ -78,4 +78,62 @@ public class RedisTokenBucketLimiter {
     public void resetUser(String userId) {
         redisTemplate.delete("rate:user:" + userId);
     }
+
+    // ===================== 新增：支持 double 类型的 rate =====================
+
+    /**
+     * 按用户限流（支持小数速率）
+     * @param userId   用户标识
+     * @param capacity 桶容量（突发数）
+     * @param rate     每秒补充的令牌数（支持小数，如 0.1 表示每10秒补充1个）
+     * @return true 允许通过，false 被限流
+     */
+    public boolean tryAcquireByUser(String userId, long capacity, double rate) {
+        return tryAcquire("rate:user:" + userId, capacity, rate, 1);
+    }
+
+    /**
+     * 按 IP 限流（支持小数速率）
+     */
+    public boolean tryAcquireByIp(String ip, long capacity, double rate) {
+        return tryAcquire("rate:ip:" + ip, capacity, rate, 1);
+    }
+
+    /**
+     * 按全局 API 限流（支持小数速率）
+     */
+    public boolean tryAcquireGlobal(String api, long capacity, double rate) {
+        return tryAcquire("rate:global:" + api, capacity, rate, 1);
+    }
+
+    /**
+     * 核心令牌桶方法（支持小数速率）
+     * @param key       限流键
+     * @param capacity  桶容量
+     * @param rate      每秒补充令牌数（支持小数）
+     * @param requested 本次请求消耗的令牌数，通常为 1
+     * @return true 允许，false 拒绝
+     */
+    public boolean tryAcquire(String key, long capacity, double rate, int requested) {
+        if (rate <= 0) {
+            throw new IllegalArgumentException("rate must be positive");
+        }
+        long now = System.currentTimeMillis() / 1000;
+        byte[] scriptBytes = TOKEN_BUCKET_SCRIPT.getBytes(StandardCharsets.UTF_8);
+        byte[] keyBytes = key.getBytes(StandardCharsets.UTF_8);
+
+        Long result = redisTemplate.execute((RedisCallback<Long>) connection -> {
+            return connection.eval(
+                    scriptBytes,
+                    ReturnType.INTEGER,
+                    1,
+                    keyBytes,
+                    String.valueOf(capacity).getBytes(StandardCharsets.UTF_8),
+                    String.valueOf(rate).getBytes(StandardCharsets.UTF_8),  // rate 传入字符串，Lua 中 tonumber 可解析
+                    String.valueOf(now).getBytes(StandardCharsets.UTF_8),
+                    String.valueOf(requested).getBytes(StandardCharsets.UTF_8)
+            );
+        });
+        return result != null && result == 1L;
+    }
 }

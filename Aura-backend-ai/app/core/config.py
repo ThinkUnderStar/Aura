@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     SPLIT_CHUNK_OVERLAP: int = 64  # 相邻两块重叠字符数
     EMBEDDING_MODEL: str #暂时只支持ollama本地部署的模型
 
+    # ==================== ComfyUI 配置 ====================
+    COMFYUI_HOST: str = "http://localhost:8188"
+    COMFYUI_WORKFLOW: str = "workflow.json"
+    COMFYUI_SAVE_PATH: str ="../Aura-backend-server/docs/temp_images"
+
     # ==================== Pydantic 配置加载规则 ====================
     model_config = SettingsConfigDict(
         env_file=".env",

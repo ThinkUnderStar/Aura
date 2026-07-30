@@ -14,5 +14,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
         registry.addResourceHandler("/uploads/workspace_logos/**")
                 .addResourceLocations("file:./docs/workspace_logos/");
+
+        registry.addResourceHandler("/uploads/temp_images/**")
+                .addResourceLocations("file:./docs/temp_images/");
     }
 }

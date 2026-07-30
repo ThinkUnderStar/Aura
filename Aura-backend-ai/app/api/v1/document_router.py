@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from fastapi.params import Query
+from fastapi import Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.mysql.session import get_db
 from app.models.response import Result

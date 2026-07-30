@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from fastapi.params import Path
+from fastapi import Path
 from app.models.response import Result
 from app.services.v1.knowledge_base_service import create_knowledge_base_service, delete_knowledge_base_service
 

@@ -14,3 +14,4 @@ asyncmy==0.2.11
 langchain_text_splitters==1.1.2
 langchain-classic==1.0.8
 cryptography==49.0.0
+comfyui-workflow-client==0.1.0

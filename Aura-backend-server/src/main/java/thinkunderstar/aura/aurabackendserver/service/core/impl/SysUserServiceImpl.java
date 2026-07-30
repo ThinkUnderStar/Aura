@@ -7,7 +7,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.reactive.function.client.WebClient;
 import thinkunderstar.aura.aurabackendserver.common.Result;
+import thinkunderstar.aura.aurabackendserver.dto.request.PromptDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.UpdateUserDto;
 import thinkunderstar.aura.aurabackendserver.entity.User;
 import thinkunderstar.aura.aurabackendserver.exception.AuthException;
@@ -33,16 +35,18 @@ public class SysUserServiceImpl implements SysUserService {
     private final UserService userService;
     private final RedisUtils redisUtils;
     private final AuthService authService;
+    private final WebClient webClient;
 
     public SysUserServiceImpl(
             RedisTokenBucketLimiter redisTokenBucketLimiter,
             UserService userService, RedisUtils redisUtils,
-            AuthService authService
-    ) {
+            AuthService authService,
+            WebClient webClient) {
         this.redisTokenBucketLimiter = redisTokenBucketLimiter;
         this.userService = userService;
         this.redisUtils = redisUtils;
         this.authService = authService;
+        this.webClient = webClient;
     }
 
     @Override
@@ -158,6 +162,32 @@ public class SysUserServiceImpl implements SysUserService {
         user.setAvatar(avatar);
         userService.updateById(user);
         return Result.success(avatar);
+    }
+
+    @Override
+    public Result<String> generate(PromptDto promptDto) {
+        if (promptDto == null || promptDto.getPrompt() == null) {
+            throw new BusinessException("ai生成头像接口的提示词参数接收异常");
+        }
+
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (!redisTokenBucketLimiter.tryAcquireByUser(String.valueOf(loginId),2,0.1)){
+            throw new BusinessException("Ai生成头像过于频繁，请稍后再试");
+        }
+
+        //调用python接口，用comfyUI生成头像文件
+        Result<String> result = webClient.post()
+                .uri("/api/v1/avatar/generate")
+                .bodyValue(promptDto)
+                .retrieve()
+                .bodyToMono(Result.class)
+                .block();
+
+        if (result == null || result.getCode() != 200 || result.getData() == null) {
+            throw new BusinessException("生成图片失败");
+        }
+
+        return Result.success("/temp_images/"+result.getData());
     }
 
     //修改用户的昵称
