@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
 import thinkunderstar.aura.aurabackendserver.common.Result;
+import thinkunderstar.aura.aurabackendserver.dto.request.AiImageDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.PromptDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.UpdateUserDto;
 import thinkunderstar.aura.aurabackendserver.entity.User;
@@ -21,9 +22,11 @@ import thinkunderstar.aura.aurabackendserver.util.RedisTokenBucketLimiter;
 import thinkunderstar.aura.aurabackendserver.util.RedisUtils;
 import thinkunderstar.aura.aurabackendserver.util.ValidateUtils;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 
 @Slf4j
@@ -151,7 +154,7 @@ public class SysUserServiceImpl implements SysUserService {
             }
         }
 
-        String avatar = "/avatars/"+StpUtil.getLoginIdAsString()+"-"+System.currentTimeMillis()+"-aura"+ext;
+        String avatar = "/avatars/"+loginId+"-"+System.currentTimeMillis()+"-aura"+ext;
         try {
             file.transferTo(Path.of("./docs"+avatar).toFile());
         } catch (IOException e) {
@@ -188,6 +191,72 @@ public class SysUserServiceImpl implements SysUserService {
         }
 
         return Result.success("/temp_images/"+result.getData());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Result<String> saveGeneratedImage(AiImageDto aiImageDto) {
+        if (aiImageDto == null
+                || aiImageDto.getImageName() == null
+                || aiImageDto.getImageName().isEmpty()
+        ) {
+            throw new BusinessException("保存AI生图接口的参数接收异常");
+        }
+
+        if (aiImageDto.getIsSaved() != 1 && aiImageDto.getIsSaved() != 0) {
+            throw new BusinessException("是否保存AI生图接口的确定参数异常");
+        }
+
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (!redisTokenBucketLimiter.tryAcquireByUser(String.valueOf(loginId),5,1)){
+            throw new BusinessException("确认是否保存AI生图过于频繁，请稍后再试");
+        }
+
+        User user = userService.getById(loginId);
+        String source = "./docs/temp_images/" + aiImageDto.getImageName();
+        Path sourcePath = Path.of(source);
+        if (aiImageDto.getIsSaved() == 1) {
+            File file = new File(source);
+            if (!file.exists()) {
+                throw new BusinessException("不存在该图片");
+            }
+
+            String avatar = "/avatars/" + loginId + "-" + System.currentTimeMillis() + "-aura.png";
+            Path targetPath = Path.of("./docs" + avatar);
+            try {
+                Files.copy(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                throw new BusinessException("保存AI生成的图片失败");
+            }
+
+            try {
+                Files.deleteIfExists(sourcePath);
+            } catch (IOException e) {
+                throw new BusinessException("删除临时文件失败");
+            }
+
+            if (!(user.getAvatar() == null || user.getAvatar().isEmpty())) {
+                String oldAvatar = "./docs" + user.getAvatar();
+                try {
+                    Files.deleteIfExists(Path.of(oldAvatar));
+                } catch (IOException e) {
+                    log.warn("用户:" + loginId + "的旧头像文件删除失败");
+                }
+            }
+
+            user.setAvatar(avatar);
+            userService.updateById(user);
+
+            return Result.success(avatar);
+        }else {
+            try {
+                Files.deleteIfExists(sourcePath);
+            } catch (IOException e) {
+                throw new BusinessException("删除临时文件失败");
+            }
+
+            return Result.success(user.getAvatar());
+        }
     }
 
     //修改用户的昵称

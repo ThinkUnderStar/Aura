@@ -1,7 +1,9 @@
 package thinkunderstar.aura.aurabackendserver.service.core;
 
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.multipart.MultipartFile;
 import thinkunderstar.aura.aurabackendserver.common.Result;
+import thinkunderstar.aura.aurabackendserver.dto.request.AiImageDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.PromptDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.UpdateUserDto;
 
@@ -59,7 +61,41 @@ public interface SysUserService {
      * </ul>
      *
      * @param promptDto 提示词请求体，包含 prompt 字段
-     * @return Result 包含临时图片访问URL，如：/uploads/temp_avatars/20260730_143022_a1b2c3d4.png
+     * @return Result 包含临时图片访问URL，如：/temp_avatars/20260730_143022_a1b2c3d4.png
      */
     Result<String> generate( PromptDto promptDto);
+
+    /**
+     * 保存AI生成的临时头像为正式头像
+     * <p>
+     * 用户预览AI生成的临时头像后，调用此接口将其保存为正式头像。
+     * 保存操作会执行以下三步流程：
+     * <ol>
+     *     <li>从临时目录复制图片到正式头像目录</li>
+     *     <li>更新当前用户的头像URL</li>
+     *     <li>删除临时目录中的图片文件</li>
+     * </ol>
+     * <p>
+     * <b>调用前提：</b>用户必须先调用生成接口（/avatar/generate）获取临时图片，
+     * 否则传入的临时文件名将无法找到对应文件。
+     * <p>
+     * <b>权限要求：</b>用户必须已登录
+     * <p>
+     * <b>限流说明：</b>保存头像属于文件操作（复制+删除），虽消耗较低但涉及用户数据更新，
+     * 同一用户每1秒仅允许1次请求，突发峰值不超过5次。
+     * <p>
+     * <b>错误码：</b>
+     * <ul>
+     *     <li>200 - 保存成功</li>
+     *     <li>400 - 临时文件名为空或格式错误</li>
+     *     <li>401 - 用户未登录</li>
+     *     <li>404 - 临时文件不存在</li>
+     *     <li>429 - 请求过于频繁，触发限流</li>
+     *     <li>500 - 服务器内部错误（文件复制/删除失败）</li>
+     * </ul>
+     *
+     * @param aiImageDto 包含临时文件名的请求体
+     * @return Result 保存结果，成功返回新头像的访问URL
+     */
+    Result<String> saveGeneratedImage( AiImageDto aiImageDto);
 }

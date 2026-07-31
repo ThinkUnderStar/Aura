@@ -1,24 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="1829a85c-8193-4763-a8fd-f016cc1e1b05" name="更改" comment="">
-      <change afterPath="$PROJECT_DIR$/app/api/v1/avatar_router.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/app/core/comfy_ui.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/app/services/v1/avatar_service.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/configs/workflows/workflow_api.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/api/v1/document_router.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/v1/document_router.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/api/v1/knowledge_base_router.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/v1/knowledge_base_router.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/api/v1/router.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/v1/router.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/core/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/core/config.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/models/request.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/models/request.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/config/WebMvcConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/config/WebMvcConfig.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/controller/SysUserController.java" beforeDir="false" afterPath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/controller/SysUserController.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/service/core/SysUserService.java" beforeDir="false" afterPath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/service/core/SysUserService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/service/core/impl/SysUserServiceImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/service/core/impl/SysUserServiceImpl.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/util/RedisTokenBucketLimiter.java" beforeDir="false" afterPath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/util/RedisTokenBucketLimiter.java" afterDir="false" />
-    </list>
+    <list default="true" id="1829a85c-8193-4763-a8fd-f016cc1e1b05" name="更改" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -118,6 +101,7 @@
       <workItem from="1785380891786" duration="7705000" />
       <workItem from="1785416065384" duration="4913000" />
       <workItem from="1785421159663" duration="583000" />
+      <workItem from="1785467180369" duration="1205000" />
     </task>
     <servers />
   </component>
