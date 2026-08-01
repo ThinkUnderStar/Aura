@@ -4,6 +4,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.crypto.digest.BCrypt;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -27,11 +28,18 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Service
 public class SysUserServiceImpl implements SysUserService {
+    private static final Pattern pattern = Pattern.compile("(\\d{8}_\\d{6})");
+    private static final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
+
     private static final long MAX_SIZE = 5*1024*1024;
 
     private final RedisTokenBucketLimiter redisTokenBucketLimiter;
@@ -362,5 +370,43 @@ public class SysUserServiceImpl implements SysUserService {
             authService.deleteUserAccount(one);
         }
         return true;
+    }
+
+    @Scheduled(cron = "0 0 3 * * ?")
+    public void cleanupTempImages(){
+        log.info("开始执行定时清理临时文件任务...");
+        File directory = new File("./docs/temp_images");
+
+        if (!directory.exists()) {
+            log.info("临时文件清理已完成");
+            return;
+        }
+
+        File[] files = directory.listFiles();
+        if (files == null || files.length == 0) {
+            log.info("临时文件清理已完成");
+            return;
+        }
+
+        //遍历每一个文件看是否有超时的临时文件
+        for (File file : files) {
+            String fileName = file.getName();
+            Matcher matcher = pattern.matcher(fileName);
+            if (matcher.find()) {
+                String time = matcher.group(1);
+
+                LocalDateTime date = LocalDateTime.parse(time, formatter);
+                LocalDateTime now = LocalDateTime.now();
+                if (now.isAfter(date.plusHours(3))) {
+                    boolean isDeleted = file.delete();
+                    if (!isDeleted) {
+                        log.warn("临时文件:"+fileName+" 清除失败");
+                    }
+                }
+            }
+
+        }
+
+        log.info("临时文件清理已完成");
     }
 }
