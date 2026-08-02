@@ -8,6 +8,7 @@ from langchain_core.documents import Document
 from app.core.config import settings
 #缓存设置
 from app.core.llm import embedding_llm
+from app.db.mysql.entities import DocumentEntity
 
 embedding_cache = CacheBackedEmbeddings.from_bytes_store(
         underlying_embeddings=embedding_llm,
@@ -15,10 +16,10 @@ embedding_cache = CacheBackedEmbeddings.from_bytes_store(
         namespace=re.sub(r'[^a-zA-Z0-9_-]', '_', settings.EMBEDDING_MODEL)
     )
 
-async def embedding_docs(docs: List[Document],doc_id: int) -> List[dict]:
+async def embedding_docs(docs: List[Document],document: DocumentEntity) -> List[dict]:
     """
     对文档进行embedding
-    :param doc_id: 文档id
+    :param document: 文件对象
     :param docs: 被embedding的文档
     :return: embedding结果
     """
@@ -32,7 +33,8 @@ async def embedding_docs(docs: List[Document],doc_id: int) -> List[dict]:
             {
                 "text": docs[i].page_content,
                 "vector": e,
-                "document_id": doc_id,
+                "document_id": document.id,
+                "document_name": document.file_name,
                 "metadata": docs[i].metadata
             }
         )

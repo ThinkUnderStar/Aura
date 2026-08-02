@@ -31,7 +31,7 @@ async def upload_document_service(kb_id: int,doc_id: int ,db: AsyncSession) -> R
 
         #上传文档指向量知识库中
         documents = await document_processor(file_path)
-        embed_documents = await embedding_docs(documents, doc_id)
+        embed_documents = await embedding_docs(documents, doc)
         await vector_store(embed_documents, kb_name)
 
         return Result.success(msg="文档上传知识库成功")
