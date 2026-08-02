@@ -37,7 +37,11 @@ class Settings(BaseSettings):
     DOCUMENT_ROOT: str = "../Aura-backend-server/docs"
     SPLIT_CHUNK_SIZE: int = 512  # 每块最大字符数
     SPLIT_CHUNK_OVERLAP: int = 64  # 相邻两块重叠字符数
-    EMBEDDING_MODEL: str #暂时只支持ollama本地部署的模型
+    EMBEDDING_MODEL: str = "qwen3-embedding:4b" #嵌入式模型
+    MULTI_QUERY_MODEL: str = "llama3.2:3b" #多重查询模型
+    RERANKER_MODEL: str = "BAAI/bge-reranker-v2-m3" #精排序模型
+    LING_GUA_MODEL: str = "microsoft/llmlingua-2-bert-base-multilingual-cased-meetingbank" #Token 缩减模型
+    EXTRACTOR_MODEL: str = "qwen2.5:3b" #摘要模型
 
     # ==================== ComfyUI 配置 ====================
     COMFYUI_HOST: str = "http://localhost:8188"
@@ -51,7 +55,6 @@ class Settings(BaseSettings):
         case_sensitive=True,
         extra="ignore"
     )
-
 
 # 创建全局配置单例
 settings = Settings()
