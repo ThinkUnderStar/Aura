@@ -69,8 +69,6 @@ public class SysAgentServiceImpl implements SysAgentService {
         Agent agent = new Agent(loginId,name.trim());
         agentService.save(agent);
 
-        log.warn("调用python端接口，创建会话级记忆库");
-
         return Result.success(agent);
     }
 

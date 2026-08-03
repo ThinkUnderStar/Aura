@@ -10,6 +10,12 @@ from langchain_core.documents import Document
 from app.core.config import settings
 from app.core.llm import multi_query_llm, reranker_llm, extractor_llm, embedding_llm
 
+#全局只加载一次
+# LLMLingua 压缩器
+lingua_compressor = LLMLinguaCompressor(
+    model_name=settings.LING_GUA_MODEL,
+    device_map="cuda"
+)
 
 async def rag_ask(question: str, collection_name: str) -> List[Document]:
     """
@@ -44,12 +50,6 @@ async def rag_ask(question: str, collection_name: str) -> List[Document]:
     reranker = CrossEncoderReranker(
         model=reranker_llm,
         top_n=5
-    )
-
-    # LLMLingua 压缩器
-    lingua_compressor= LLMLinguaCompressor(
-        model_name=settings.LING_GUA_MODEL,
-        device_map="cuda"
     )
 
     #LLMChainExtractor 压缩器

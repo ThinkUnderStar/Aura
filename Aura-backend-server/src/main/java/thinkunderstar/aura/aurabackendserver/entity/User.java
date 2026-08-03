@@ -56,6 +56,16 @@ public class User {
     private LocalDateTime updateTime;
 
     /**
+     * 乐观锁版本号
+     * <p>
+     * 插入时自动填充为 1，每次更新时自动 +1。
+     * 用于防止并发更新冲突。
+     */
+    @Version
+    @TableField(fill = FieldFill.INSERT)
+    private Integer version;
+
+    /**
      * 0为正常，1为被删除
      */
     private Integer deleted;

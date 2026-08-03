@@ -2,13 +2,30 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="1829a85c-8193-4763-a8fd-f016cc1e1b05" name="更改" comment="">
-      <change afterPath="$PROJECT_DIR$/app/services/rag/rag_flow.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/services/agent/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/services/agent/graph.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/services/agent/nodes.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/services/agent/tools.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/core/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/core/config.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/core/llm.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/core/llm.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/services/rag/embedding.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/rag/embedding.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/services/v1/document_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/v1/document_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/db/mysql/entities.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/db/mysql/entities.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/services/rag/rag_flow.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/rag/rag_flow.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/entity/Agent.java" beforeDir="false" afterPath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/entity/Agent.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/entity/AgentKbBinding.java" beforeDir="false" afterPath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/entity/AgentKbBinding.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/entity/Document.java" beforeDir="false" afterPath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/entity/Document.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/entity/Feedback.java" beforeDir="false" afterPath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/entity/Feedback.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/entity/KnowledgeBase.java" beforeDir="false" afterPath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/entity/KnowledgeBase.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/entity/Message.java" beforeDir="false" afterPath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/entity/Message.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/entity/Notification.java" beforeDir="false" afterPath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/entity/Notification.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/entity/Report.java" beforeDir="false" afterPath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/entity/Report.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/entity/User.java" beforeDir="false" afterPath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/entity/User.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/entity/Workspace.java" beforeDir="false" afterPath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/entity/Workspace.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/entity/WorkspaceMember.java" beforeDir="false" afterPath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/entity/WorkspaceMember.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/entity/WorkspaceOperationLog.java" beforeDir="false" afterPath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/entity/WorkspaceOperationLog.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/handler/MyMetaObjectHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/handler/MyMetaObjectHandler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/service/core/impl/SysAgentServiceImpl.java" beforeDir="false" afterPath="$PROJECT_DIR$/../Aura-backend-server/src/main/java/thinkunderstar/aura/aurabackendserver/service/core/impl/SysAgentServiceImpl.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -73,6 +90,10 @@
       <option name="ENV_FILES" value="" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="HF_HUB_OFFLINE" value="1" />
+        <env name="TRANSFORMERS_OFFLINE" value="1" />
+      </envs>
       <option name="SDK_HOME" value="$PROJECT_DIR$/.venv/Scripts/python.exe" />
       <option name="SDK_NAME" value="Python 3.12 (Aura-backend-ai)" />
       <option name="WORKING_DIRECTORY" value="" />
@@ -118,6 +139,7 @@
       <workItem from="1785636201683" duration="15734000" />
       <workItem from="1785671968443" duration="108000" />
       <workItem from="1785672114041" duration="6388000" />
+      <workItem from="1785726796909" duration="8127000" />
     </task>
     <servers />
   </component>
@@ -125,6 +147,6 @@
     <option name="version" value="3" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
-    <SUITE FILE_PATH="coverage/Aura_backend_ai$aura.coverage" NAME="aura 覆盖结果" MODIFIED="1785679589338" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
+    <SUITE FILE_PATH="coverage/Aura_backend_ai$aura.coverage" NAME="aura 覆盖结果" MODIFIED="1785740036585" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
   </component>
 </project>

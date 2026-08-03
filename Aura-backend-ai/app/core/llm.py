@@ -1,8 +1,10 @@
 from langchain_community.cross_encoders import HuggingFaceCrossEncoder
 from langchain_ollama import ChatOllama, OllamaEmbeddings
+from langchain_openai import ChatOpenAI
 
 from app.core.config import settings
 
+#=======================RAG 相关模型===========================
 #创建嵌入模型
 embedding_llm = OllamaEmbeddings(model=settings.EMBEDDING_MODEL)
 
@@ -22,4 +24,15 @@ extractor_llm = ChatOllama(
 reranker_llm = HuggingFaceCrossEncoder(
     model_name=settings.RERANKER_MODEL,
     model_kwargs={"device": "cuda"}
+)
+
+#=========================用户交互 LLM===============================
+chat_llm = ChatOpenAI(
+    model=settings.CHAT_MODEL_NAME,
+    temperature=settings.CHAT_MODEL_TEMPERATURE,
+    base_url=settings.CHAT_MODEL_BASE_URL,
+    api_key=settings.CHAT_MODEL_API_KEY,
+    model_kwargs={
+        "thinking": {"type": "disabled"}  #考虑到兼容问题，关闭深度思考
+    }
 )
