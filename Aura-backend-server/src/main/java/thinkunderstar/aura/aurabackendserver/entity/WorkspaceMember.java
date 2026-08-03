@@ -27,6 +27,16 @@ public class WorkspaceMember {
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime joinedAt;
 
+    /**
+     * 乐观锁版本号
+     * <p>
+     * 插入时自动填充为 1，每次更新时自动 +1。
+     * 用于防止并发更新冲突。
+     */
+    @Version
+    @TableField(fill = FieldFill.INSERT)
+    private Integer version;
+
     public WorkspaceMember() {}
 
     public WorkspaceMember(Long workspaceId, Long userId, Integer role) {

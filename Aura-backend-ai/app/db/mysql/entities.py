@@ -23,6 +23,7 @@ class UserEntity(Base):
     create_time = Column(DateTime, nullable=True, server_default=func.now(), comment="创建时间")
     update_time = Column(DateTime, nullable=True, server_default=func.now(), onupdate=func.now(), comment="更新时间")
     deleted = Column(SmallInteger, nullable=True, default=0, comment="0-未删 1-已删")
+    version = Column(Integer, nullable=False, default=1, comment="乐观锁版本号")
 
 
 class AgentEntity(Base):
@@ -35,6 +36,7 @@ class AgentEntity(Base):
     status = Column(SmallInteger, nullable=True, default=1, index=True, comment="1-活跃 0-已归档")
     create_time = Column(DateTime, nullable=True, server_default=func.now(), comment="创建时间")
     update_time = Column(DateTime, nullable=True, server_default=func.now(), onupdate=func.now(), comment="更新时间")
+    version = Column(Integer, nullable=False, default=1, comment="乐观锁版本号")
 
 
 class WorkspaceEntity(Base):
@@ -51,6 +53,7 @@ class WorkspaceEntity(Base):
     status = Column(SmallInteger, nullable=True, default=1, index=True, comment="1-正常 0-已解散 2-已归档")
     create_time = Column(DateTime, nullable=True, server_default=func.now(), comment="创建时间")
     update_time = Column(DateTime, nullable=True, server_default=func.now(), onupdate=func.now(), comment="更新时间")
+    version = Column(Integer, nullable=False, default=1, comment="乐观锁版本号")
 
 
 class WorkspaceMemberEntity(Base):
@@ -63,6 +66,7 @@ class WorkspaceMemberEntity(Base):
     role = Column(SmallInteger, nullable=False, index=True, comment="0-创建者 1-管理员 2-普通成员")
     joined_at = Column(DateTime, nullable=True, server_default=func.now(), comment="加入时间")
     status = Column(Integer, nullable=False, default=1, comment="0-已退出团队 1-在团队中")
+    version = Column(Integer, nullable=False, default=1, comment="乐观锁版本号")
 
 
 class MessageEntity(Base):
@@ -71,11 +75,11 @@ class MessageEntity(Base):
 
     id = Column(BigInteger, primary_key=True, autoincrement=True, comment="消息ID")
     agent_id = Column(BigInteger, nullable=False, index=True, comment="所属AgentID（对话ID）")
-    role = Column(String(20), nullable=False, comment="user / assistant / tool")
+    branch_path = Column(String(255), nullable=False, default="main", index=True, comment="分支路径，默认main")
+    role = Column(String(20), nullable=False, comment="user / assistant")
     content = Column(Text, nullable=True, comment="消息内容")
-    tool_calls = Column(JSON, nullable=True, comment="工具调用记录")
-    thought = Column(Text, nullable=True, comment="Agent思考过程（可选）")
-    create_time = Column(DateTime, nullable=True, index=True, server_default=func.now(), comment="创建时间")
+    version = Column(Integer, nullable=False, default=1, comment="乐观锁版本号")
+    create_time = Column(DateTime, nullable=True, server_default=func.now(), comment="创建时间")
 
 
 class KnowledgeBaseEntity(Base):
@@ -91,6 +95,7 @@ class KnowledgeBaseEntity(Base):
     status = Column(SmallInteger, nullable=True, default=1, comment="1-启用 0-停用")
     create_time = Column(DateTime, nullable=True, server_default=func.now(), comment="创建时间")
     update_time = Column(DateTime, nullable=True, server_default=func.now(), onupdate=func.now(), comment="更新时间")
+    version = Column(Integer, nullable=False, default=1, comment="乐观锁版本号")
 
 
 class DocumentEntity(Base):
@@ -107,6 +112,7 @@ class DocumentEntity(Base):
     upload_by = Column(BigInteger, nullable=True, index=True, comment="上传者ID")
     create_time = Column(DateTime, nullable=True, index=True, server_default=func.now(), comment="创建时间")
     update_time = Column(DateTime, nullable=True, server_default=func.now(), onupdate=func.now(), comment="更新时间")
+    version = Column(Integer, nullable=False, default=1, comment="乐观锁版本号")
 
 
 class AgentKbBindingEntity(Base):
@@ -117,6 +123,7 @@ class AgentKbBindingEntity(Base):
     agent_id = Column(BigInteger, nullable=False, index=True, comment="AgentID")
     kb_id = Column(BigInteger, nullable=False, index=True, comment="知识库ID")
     create_time = Column(DateTime, nullable=True, server_default=func.now(), comment="绑定时间")
+    version = Column(Integer, nullable=False, default=1, comment="乐观锁版本号")
 
 
 class FeedbackEntity(Base):
@@ -135,6 +142,7 @@ class FeedbackEntity(Base):
     reply_time = Column(DateTime, nullable=True, comment="回复时间")
     create_time = Column(DateTime, nullable=True, server_default=func.now(), comment="创建时间")
     update_time = Column(DateTime, nullable=True, server_default=func.now(), onupdate=func.now(), comment="更新时间")
+    version = Column(Integer, nullable=False, default=1, comment="乐观锁版本号")
 
 
 class NotificationEntity(Base):
@@ -151,6 +159,7 @@ class NotificationEntity(Base):
     status = Column(SmallInteger, nullable=True, default=1, comment="0-已删除 1-正常")
     create_time = Column(DateTime, nullable=True, server_default=func.now(), comment="创建时间")
     update_time = Column(DateTime, nullable=True, server_default=func.now(), onupdate=func.now(), comment="更新时间")
+    version = Column(Integer, nullable=False, default=1, comment="乐观锁版本号")
 
 
 class ReportEntity(Base):
@@ -171,6 +180,7 @@ class ReportEntity(Base):
     handle_time = Column(DateTime, nullable=True, comment="处理时间")
     create_time = Column(DateTime, nullable=True, server_default=func.now(), comment="创建时间")
     update_time = Column(DateTime, nullable=True, server_default=func.now(), onupdate=func.now(), comment="更新时间")
+    version = Column(Integer, nullable=False, default=1, comment="乐观锁版本号")
 
 
 class WorkspaceOperationLogEntity(Base):
@@ -186,3 +196,4 @@ class WorkspaceOperationLogEntity(Base):
     status = Column(SmallInteger, nullable=True, default=1, comment="1-成功 0-失败")
     create_time = Column(DateTime, nullable=True, index=True, server_default=func.now(), comment="操作时间")
     username = Column(String(50), nullable=False, comment="操作者的用户昵称")
+    version = Column(Integer, nullable=False, default=1, comment="乐观锁版本号")

@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     LING_GUA_MODEL: str = "microsoft/llmlingua-2-bert-base-multilingual-cased-meetingbank" #Token 缩减模型
     EXTRACTOR_MODEL: str = "qwen2.5:3b" #摘要模型
 
+    #====================用户交互 LLM========================
+    CHAT_MODEL_NAME: str #OpenAI系列的模型名
+    CHAT_MODEL_API_KEY: str #对应模型的API密钥
+    CHAT_MODEL_BASE_URL: str #对应模型的API地址
+    CHAT_MODEL_TEMPERATURE: float #模型对应的随机性控制参数
+
     # ==================== ComfyUI 配置 ====================
     COMFYUI_HOST: str = "http://localhost:8188"
     COMFYUI_WORKFLOW: str = "workflow.json"

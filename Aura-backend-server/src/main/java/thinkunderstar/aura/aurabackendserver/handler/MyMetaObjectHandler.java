@@ -21,6 +21,12 @@ public class MyMetaObjectHandler implements MetaObjectHandler {
 
         // 2. 必须同时填充更新时间，否则乐观锁会因为 NULL 而报错！
         this.strictInsertFill(metaObject, "updateTime", LocalDateTime.class, now);
+
+        // 3. 填充加入时间
+        this.strictInsertFill(metaObject, "joinedAt", LocalDateTime.class, now);
+
+        // 4. 填充乐观锁版本字段的初始值
+        this.strictInsertFill(metaObject, "version", Integer.class, 1);
     }
 
     @Override
