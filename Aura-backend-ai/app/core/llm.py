@@ -32,7 +32,7 @@ chat_llm = ChatOpenAI(
     temperature=settings.CHAT_MODEL_TEMPERATURE,
     base_url=settings.CHAT_MODEL_BASE_URL,
     api_key=settings.CHAT_MODEL_API_KEY,
-    model_kwargs={
+    extra_body={
         "thinking": {"type": "disabled"}  #考虑到兼容问题，关闭深度思考
     }
 )
