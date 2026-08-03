@@ -2,11 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="1829a85c-8193-4763-a8fd-f016cc1e1b05" name="更改" comment="">
-      <change afterPath="$PROJECT_DIR$/app/db/postgresql/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/core/llm.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/core/llm.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/services/agent/graph.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/agent/graph.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/services/agent/nodes.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/agent/nodes.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -122,6 +119,7 @@
       <workItem from="1785672114041" duration="6388000" />
       <workItem from="1785726796909" duration="8283000" />
       <workItem from="1785757398168" duration="6121000" />
+      <workItem from="1785766818069" duration="37000" />
     </task>
     <servers />
   </component>
