@@ -1,8 +1,12 @@
+<<<<<<< HEAD
 import asyncio
+=======
+>>>>>>> 4d49afe47c2342535879eda8e54f7f6b48ca99bd
 from typing import List
 
 from langchain_core.tools import tool
 
+<<<<<<< HEAD
 from app.services.rag.rag_flow import rag_ask
 from app.tools.to_str import list_document_to_str
 
@@ -48,3 +52,8 @@ async def search_knowledge_base(question: str, kbs_name: List[str]) -> str:
 
     except Exception as e:
         return "知识库查询异常"
+=======
+@tool
+async def search_knowledge_base(question:str,kb_ids:List[int]) -> str:
+    pass
+>>>>>>> 4d49afe47c2342535879eda8e54f7f6b48ca99bd
