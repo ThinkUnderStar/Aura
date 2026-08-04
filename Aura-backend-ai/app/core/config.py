@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     MILVUS_DB_NAME: str = "aura"  # 默认数据库
     MILVUS_DIMENSION: int = 2560  # 默认向量维度
 
+    # ==================== PostgreSql 配置 ====================
+    POSTGRES_URL: str = "postgresql://postgres:密码@localhost:5432/aura"
+
     # ==================== RAG 配置 ====================
     DOCUMENT_ROOT: str = "../Aura-backend-server/docs"
     SPLIT_CHUNK_SIZE: int = 512  # 每块最大字符数
