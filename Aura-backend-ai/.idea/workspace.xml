@@ -2,10 +2,20 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="1829a85c-8193-4763-a8fd-f016cc1e1b05" name="更改" comment="">
+<<<<<<< HEAD
       <change afterPath="$PROJECT_DIR$/app/tools/__init__.py" afterDir="false" />
       <change afterPath="$PROJECT_DIR$/app/tools/to_str.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/services/agent/tools.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/agent/tools.py" afterDir="false" />
+=======
+      <change afterPath="$PROJECT_DIR$/app/db/postgresql/connect.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/core/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/core/config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/services/agent/tools.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/agent/tools.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/services/rag/rag_flow.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/rag/rag_flow.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
+>>>>>>> 4d49afe47c2342535879eda8e54f7f6b48ca99bd
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -124,7 +134,10 @@
       <workItem from="1785766818069" duration="37000" />
       <workItem from="1785767084575" duration="22000" />
       <workItem from="1785814090569" duration="8862000" />
+<<<<<<< HEAD
       <workItem from="1785844965119" duration="4018000" />
+=======
+>>>>>>> 4d49afe47c2342535879eda8e54f7f6b48ca99bd
     </task>
     <servers />
   </component>
