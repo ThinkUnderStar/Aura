@@ -3,7 +3,6 @@ from langchain_classic.retrievers import MultiQueryRetriever, ContextualCompress
 from langchain_classic.retrievers.document_compressors import CrossEncoderReranker, LLMChainExtractor, \
     DocumentCompressorPipeline
 from langchain_community.document_compressors import LLMLinguaCompressor
-from langchain_community.document_transformers import LongContextReorder
 from langchain_community.vectorstores import Milvus
 from langchain_core.documents import Document
 
@@ -55,14 +54,10 @@ async def rag_ask(question: str, collection_name: str) -> List[Document]:
     #LLMChainExtractor 压缩器
     extractor = LLMChainExtractor.from_llm(llm=extractor_llm)
 
-    #LongContextReorder 压缩器
-    reorder = LongContextReorder()
-
     #构建压缩管道
     pipline = DocumentCompressorPipeline(
         transformers=[
             reranker, #按相关性从大到小精排序
-            reorder, #重心往两端移动
             lingua_compressor, #token 缩减
             extractor #摘要
         ]
