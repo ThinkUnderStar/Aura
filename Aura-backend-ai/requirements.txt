@@ -29,8 +29,12 @@ sqlalchemy==2.0.41
 pymysql==1.1.1
 asyncmy==0.2.11
 
+# ==================== Postgresql 数据库驱动 ====================
+langgraph-checkpoint-postgres==3.1.0
+psycopg[binary]==3.2.1
+
 # ==================== 深度学习与模型加载 ====================
-torch==2.6.0              # CUDA 11.8 版本
+torch==2.6.0
 transformers==5.9.0
 sentence-transformers==5.6.1
 cryptography==49.0.0

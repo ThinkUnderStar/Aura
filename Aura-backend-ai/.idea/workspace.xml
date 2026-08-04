@@ -2,8 +2,13 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="1829a85c-8193-4763-a8fd-f016cc1e1b05" name="更改" comment="">
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/db/postgresql/connect.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/core/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/core/config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/services/agent/tools.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/agent/tools.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/services/rag/rag_flow.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/rag/rag_flow.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -120,6 +125,8 @@
       <workItem from="1785726796909" duration="8283000" />
       <workItem from="1785757398168" duration="6121000" />
       <workItem from="1785766818069" duration="37000" />
+      <workItem from="1785767084575" duration="22000" />
+      <workItem from="1785814090569" duration="8862000" />
     </task>
     <servers />
   </component>
@@ -127,6 +134,6 @@
     <option name="version" value="3" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
-    <SUITE FILE_PATH="coverage/Aura_backend_ai$aura.coverage" NAME="aura 覆盖结果" MODIFIED="1785740036585" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
+    <SUITE FILE_PATH="coverage/Aura_backend_ai$aura.coverage" NAME="aura 覆盖结果" MODIFIED="1785820918576" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="" />
   </component>
 </project>
