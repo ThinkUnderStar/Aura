@@ -61,6 +61,7 @@ async def save_user_memory(
     保存用户的长期记忆（偏好、事实、习惯等）。
     该工具用于将用户提供的信息持久化存储到当前会话或用户的长期记忆空间中。
     存储的数据可在后续对话中被 `search_user_memory` 或 `manage_user_memory` 等工具检索和使用。
+
     Args:
         thing (str): 用户希望记住的内容，如“我喜欢简洁的回答”、“我的名字是张三”等。
         config (RunnableConfig): LangGraph 自动注入的运行时配置，通常包含 thread_id 或 user_id，
