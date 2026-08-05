@@ -1,8 +1,8 @@
-from typing import List
+from typing import List, Annotated
 
 from langchain_core.messages import BaseMessage
 from langgraph.constants import START
-from langgraph.graph import StateGraph
+from langgraph.graph import StateGraph, add_messages
 from pydantic.v1 import BaseModel
 
 from app.db.postgresql.connect import checkpoint, store
@@ -11,8 +11,7 @@ from app.services.agent.nodes import llm_node, run_tool
 
 #创建节点间的通讯类
 class State(BaseModel):
-    messages: List[BaseMessage]
-
+    messages: Annotated[List[BaseMessage],add_messages]
 
 #创建图
 graph = StateGraph(State)

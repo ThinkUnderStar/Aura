@@ -1,10 +1,11 @@
 from langchain_core.messages import ToolMessage
+from langchain_core.runnables import RunnableConfig
 from langgraph.constants import END
-from langgraph.types import Command
+from langgraph.types import Command, interrupt
 
 from app.core.llm import chat_llm
 from app.services.agent.graph import State
-from app.services.agent.tools import search_knowledge_base
+from app.services.agent.tools import search_knowledge_base, save_user_memory
 
 
 async def llm_node(state:State) -> State:
@@ -56,8 +57,32 @@ async def run_tool(state:State) -> State:
     tool_calls = state.messages[-1].tool_calls
 
     for tool_call in tool_calls:
+        #增强检索指定知识库
         if tool_call["name"] == "search_knowledge_base":
             result = await search_knowledge_base.ainvoke(tool_call["args"])
+
+        #添加用户级记忆（需用户自己确认）
+        elif tool_call["name"] == "save_user_memory":
+
+            user_choice = interrupt({
+                "question": f"是否同意将:\n {tool_call["args"]["thing"]} \n添加进用户级记忆？",
+                "options": ["approve", "reject", "edit"]
+            })
+
+            if user_choice["choice"] == "approve":
+
+                result = await save_user_memory.ainvoke(tool_call["args"])
+            elif user_choice["choice"] == "reject":
+
+                result = "用户拒绝将该内容添加进用户级记忆"
+            elif user_choice["choice"] == "edit":
+
+                result = await save_user_memory.ainvoke(user_choice["edit"])
+            else:
+
+                result = "用户的选择异常，不符合规范"
+
+        #过滤对不存在工具的调用
         else:
             result = "未查询到该工具"
 
@@ -70,4 +95,36 @@ async def run_tool(state:State) -> State:
 
     return {"messages": messages}
 
+async def relevant_user_memories(state:State,config:RunnableConfig):
+    """
+    从用户级记忆中检索与当前问题最相关的记忆，并注入到消息状态中。
 
+    该节点在每次 LLM 调用之前执行，作为图中的一个前置节点。
+    它从当前会话的最后一条 HumanMessage 中提取问题文本，使用语义检索从用户的长期记忆库中
+    查找最相关的记忆片段，然后将这些记忆格式化为 SystemMessage，放置到消息列表的最前面，
+    供后续的 LLM 节点参考。
+
+    该节点是“动态记忆注入”的核心实现，确保 LLM 在每次回答时都能感知到与当前问题
+    最相关的用户历史偏好或事实，同时避免将无关记忆全部塞入上下文。
+
+    Args:
+        state (State): 当前图状态，应包含 `messages` 列表，其中至少有一条 HumanMessage。
+        config (RunnableConfig): 运行时配置，必须包含 `configurable.user_id` 或 `thread_id`，
+            用于确定当前用户的记忆命名空间。
+
+    Returns:
+        dict: 更新后的状态字典，主要修改 `messages` 字段：
+            - 如果存在 SystemMessage，将其替换为包含相关记忆的新 SystemMessage。
+            - 否则，在列表最前插入新 SystemMessage。
+
+    Example:
+        假设用户消息为 "我喜欢简洁的回答"，该节点会检索到之前存储的
+        “用户偏好简洁风格”等记忆，并注入到 system prompt 中，
+        使得后续 LLM 回答时自动采用简洁风格。
+
+    注意：
+        - 该节点依赖 `store` 支持向量语义搜索（如 AsyncPostgresStore）。
+        - 如果存储不支持或检索失败，会返回空记忆提示，不影响主流程。
+        - 仅检索与当前问题最相关的 5 条记忆，以控制上下文长度。
+    """
+    pass
