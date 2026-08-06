@@ -1,11 +1,13 @@
 from langchain_core.messages import ToolMessage
 from langchain_core.runnables import RunnableConfig
+from langgraph.config import get_store
 from langgraph.constants import END
 from langgraph.types import Command, interrupt
 
 from app.core.llm import chat_llm
 from app.services.agent.graph import State
-from app.services.agent.tools import search_knowledge_base, save_user_memory
+from app.services.agent.prompts import SYSTEM_PROMPT_TEMPLATE
+from app.services.agent.tools import search_knowledge_base, save_user_memory, get_user_memory, search_user_memory
 
 
 async def llm_node(state:State) -> State:
@@ -82,6 +84,18 @@ async def run_tool(state:State) -> State:
 
                 result = "用户的选择异常，不符合规范"
 
+        #获取用户的所有用户级记忆
+        elif tool_call["name"] == "get_user_memory":
+            result = await get_user_memory.ainvoke(tool_call["args"])
+
+        #搜索该用户的相关用户级记忆
+        elif tool_call["name"] == "search_user_memory":
+            result = await search_user_memory.ainvoke(tool_call["args"])
+
+        #删除用户指定的用户级记忆
+        elif tool_call["name"] == "delete_user_memory":
+            pass
+
         #过滤对不存在工具的调用
         else:
             result = "未查询到该工具"
@@ -95,7 +109,7 @@ async def run_tool(state:State) -> State:
 
     return {"messages": messages}
 
-async def relevant_user_memories(state:State,config:RunnableConfig):
+async def relevant_user_memories(state:State,config:RunnableConfig) -> State:
     """
     从用户级记忆中检索与当前问题最相关的记忆，并注入到消息状态中。
 
@@ -127,4 +141,25 @@ async def relevant_user_memories(state:State,config:RunnableConfig):
         - 如果存储不支持或检索失败，会返回空记忆提示，不影响主流程。
         - 仅检索与当前问题最相关的 5 条记忆，以控制上下文长度。
     """
-    pass
+    question = state.messages[-1].content
+    store = get_store()
+    memories = ""
+
+    user_id = config.get("configurable", {}).get("user_id", "default_user_id")
+    if user_id == "default_user_id":
+        memories = "未指定用户ID"
+
+    else:
+        user_memory_space = ("users_memory",user_id)
+        results = await store.asearch(user_memory_space,query=str(question),limit=5)
+
+        if not results:
+            memories = "无相关用户级记忆"
+        else:
+            for result in results:
+                memories = memories + result.value["data"] + "\n"
+
+    system_prompt = await SYSTEM_PROMPT_TEMPLATE.ainvoke({"memories": memories})
+    system_message = state.messages[0]
+    system_message.content = system_prompt
+    return {"messages": [system_message]}

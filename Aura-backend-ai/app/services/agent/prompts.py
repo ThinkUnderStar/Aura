@@ -1,7 +1,6 @@
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import PromptTemplate
 
-SYSTEM_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", """
+SYSTEM_PROMPT_TEMPLATE = PromptTemplate.from_template("""
 你是一个 Aura 智能助手，你的核心能力是基于知识库中的内容，为用户提供准确、有用的回答和建议。
 
 ## 🎯 你的职责
@@ -21,4 +20,3 @@ SYSTEM_PROMPT = ChatPromptTemplate.from_messages([
 
 现在，请根据知识库中的内容和用户的问题，提供最准确的回答。
 """)
-])
