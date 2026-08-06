@@ -43,12 +43,14 @@ public class Message {
     /**
      * 消息角色
      * <p>
-     * 取值：user（用户）、assistant（助手）
+     * 取值：user（用户）、assistant（助手）、tool_confirm（工具确认消息）
      */
     private String role;
 
     /**
      * 对话内容（原始文本）
+     * <p>
+     * 对于 tool_confirm 类型，存储完整的操作描述
      */
     private String content;
 
@@ -69,4 +71,17 @@ public class Message {
      */
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
+
+    // ===== 工具确认专用字段（仅 tool_confirm 时有值） =====
+    /**
+     * 用户确认动作
+     * <p>
+     * 取值：approve（同意）、reject（拒绝）、edit（编辑后同意，这个选择有些工具可能没有）
+     */
+    private String action;
+
+    /**
+     * 用户编辑后的新内容（仅 action = 'edit' 时有值）
+     */
+    private String editedContent;
 }
