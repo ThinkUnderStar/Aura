@@ -76,8 +76,13 @@ class MessageEntity(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True, comment="消息ID")
     agent_id = Column(BigInteger, nullable=False, index=True, comment="所属AgentID（对话ID）")
     branch_path = Column(String(255), nullable=False, default="main", index=True, comment="分支路径，默认main")
-    role = Column(String(20), nullable=False, comment="user / assistant")
+    role = Column(String(20), nullable=False, comment="user / assistant / tool_confirm")
     content = Column(Text, nullable=True, comment="消息内容")
+
+    # ===== 工具确认专用字段（仅 tool_confirm 时有值） =====
+    action = Column(String(20), nullable=True, comment="用户确认动作: approve / reject / edit")
+    edited_content = Column(Text, nullable=True, comment="用户编辑后的新内容（仅 action='edit' 时有值）")
+
     version = Column(Integer, nullable=False, default=1, comment="乐观锁版本号")
     create_time = Column(DateTime, nullable=True, server_default=func.now(), comment="创建时间")
 

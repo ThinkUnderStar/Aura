@@ -1,13 +1,15 @@
+from typing import List
+
 from langchain_core.messages import ToolMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.config import get_store
 from langgraph.constants import END
 from langgraph.types import Command, interrupt
-
-from app.core.llm import chat_llm
 from app.services.agent.graph import State
+from app.services.agent.llm import chat_llm_with_tools
 from app.services.agent.prompts import SYSTEM_PROMPT_TEMPLATE
-from app.services.agent.tools import search_knowledge_base, save_user_memory, get_user_memory, search_user_memory
+from app.services.agent.tools import search_knowledge_base, save_user_memory, get_user_memory, search_user_memory, \
+    delete_user_memory
 
 
 async def llm_node(state:State) -> State:
@@ -16,7 +18,7 @@ async def llm_node(state:State) -> State:
     :param state: 各个节点相互通信的通信类对象
     :return: State
     """
-    response = await chat_llm.ainvoke(state.messages)
+    response = await chat_llm_with_tools.ainvoke(state.messages)
 
     if response.tool_calls:
         return Command(
@@ -29,7 +31,7 @@ async def llm_node(state:State) -> State:
             goto=END
         )
 
-async def run_tool(state:State) -> State:
+async def run_tool(state:State,config:RunnableConfig) -> State:
     """
        执行工具调用并更新状态。
 
@@ -55,6 +57,7 @@ async def run_tool(state:State) -> State:
            4. 返回包含 ToolMessage 列表的更新状态。
            5. 后续节点（如模型节点）可基于工具结果继续生成回答。
        """
+    store = get_store()
     messages = []
     tool_calls = state.messages[-1].tool_calls
 
@@ -94,7 +97,40 @@ async def run_tool(state:State) -> State:
 
         #删除用户指定的用户级记忆
         elif tool_call["name"] == "delete_user_memory":
-            pass
+            question = "是否同意将以下用户级记忆内容从用户级记忆中删除:\n"
+            # 获取当前会话或用户的唯一标识符
+            user_id = config.get("configurable", {}).get("user_id", "default_user_id")
+            if user_id == "default_user_id":
+                result =  "未指定用户ID"
+            else:
+                user_memory_space = ("users_memory", user_id)
+
+                keys: List[str] = tool_call["args"]["keys"]
+                if not keys:
+                    result = "未传入要删除用户级记忆的key"
+                else:
+                    for key in keys:
+                        content = ""
+                        item = await store.aget(namespace=user_memory_space, key=key)
+                        if item is None:
+                            content = "该key并不对应任何一个用户记忆"
+                        else:
+                            content = item.value["data"]
+                        question = question + content +"\n"
+
+                    user_choice = interrupt({
+                        "question": question,
+                        "options": ["approve", "reject"]
+                    })
+
+                    if user_choice["choice"] == "reject":
+                        result = "用户拒绝删除这些用户级记忆"
+
+                    elif user_choice["choice"] == "approve":
+                        result = await delete_user_memory.ainvoke(tool_call["args"])
+
+                    else:
+                        result = "用户的选择异常，不符合规范"
 
         #过滤对不存在工具的调用
         else:
