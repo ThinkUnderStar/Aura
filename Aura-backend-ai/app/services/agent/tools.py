@@ -91,3 +91,162 @@ async def save_user_memory(
         return "存储成功"
     except Exception as e:
         return "存储失败"
+
+@tool(name_or_callable="get_user_memory")
+async def get_user_memory(
+        config:RunnableConfig
+) -> str:
+    """
+    获取当前用户已保存的全部用户级记忆（列表形式）。
+
+    该工具用于当用户明确询问“你记得我哪些信息？”、“我有哪些记忆？”、“你记住我什么了？”时，
+    将用户的所有记忆以可读的列表形式返回给用户，帮助用户了解当前存储了哪些个人信息。
+
+    该工具获取的是用户级记忆的**全部内容**，而非仅与当前问题相关的部分。
+    如果记忆数量较多，返回的内容可能会较长，建议仅在用户明确需要查看全部记忆时使用。
+
+    Args:
+        config (RunnableConfig): LangGraph 自动注入的运行时配置，包含 `configurable.user_id`，
+            用于确定当前用户的记忆命名空间。该参数由框架自动传入，调用时无需显式提供。
+
+    Returns:
+        str: 格式化后的记忆列表，每条记忆占一行，例如：
+            - 你喜欢简洁的回答
+            - 你的名字是张三
+            如果没有记忆，返回“当前用户暂无任何记忆。”
+
+    注意：
+        - 该工具返回的字符串包含所有记忆，可能较长。
+        - 该工具不会触发中断确认，直接返回结果。
+        - 当前实现最多返回 1000 条记忆（limit=1000），如果用户记忆超过此数量，请调整 limit 参数。
+    """
+    try:
+        store = get_store()
+        memories = ""
+
+        # 获取当前会话或用户的唯一标识符
+        user_id = config.get("configurable", {}).get("user_id", "default_user_id")
+        if user_id == "default_user_id":
+            return "未指定用户ID"
+
+        user_memory_space = ("users_memory", user_id)
+
+        results = await store.asearch(user_memory_space,limit=1000)
+
+        if not results:
+            memories = "用户还未添加任何用户级记忆"
+        else:
+            for result in results:
+                memories = memories+ "key: "+ result.key + " content: " + result.value["data"] + "\n"
+
+        return memories
+
+    except Exception as e:
+        return "获取该用户的用户级记忆异常"
+
+@tool(name_or_callable="search_user_memory")
+async def search_user_memory(
+        query:str,
+        config:RunnableConfig
+) -> str:
+    """
+    根据关键词或问题，搜索当前用户的相关用户级记忆。
+
+    该工具用于当用户询问与之前存储的信息相关的问题时（例如“我之前说过我喜欢什么风格？”），
+    从用户的全部记忆中检索与 `query` 语义或关键词最匹配的记忆片段。
+
+    该工具执行的是**基于关键词的全文搜索**，返回与 `query` 最相关的记忆（按相关性排序）。
+    注意：当前的存储后端（如 InMemoryStore 或 AsyncPostgresStore）默认使用关键词匹配，
+    而非向量语义检索。如果需要语义检索，需配置向量索引。
+
+    Args:
+        query (str): 搜索关键词或问题，例如“用户偏好的回答风格”、“用户的名字”等。
+        config (RunnableConfig): LangGraph 自动注入的运行时配置，包含 `configurable.user_id`，
+            用于确定当前用户的记忆命名空间。该参数由框架自动传入，调用时无需显式提供。
+
+    Returns:
+        str: 格式化后的匹配记忆列表，每条记忆占一行，例如：
+            - 你喜欢简洁的回答
+            - 你的名字是张三
+            如果没有匹配结果，返回“未查询到关于该问题的任何用户级记忆”。
+
+    注意：
+        - 该工具最多返回 10 条最相关的记忆（由 limit=10 控制），如需更多可调整。
+        - 该工具不会触发中断确认，直接返回结果。
+        - 搜索基于关键词匹配，而非语义理解，请确保 `query` 包含足够的关键词。
+    """
+    try:
+        store = get_store()
+        memories = ""
+
+        # 获取当前会话或用户的唯一标识符
+        user_id = config.get("configurable", {}).get("user_id", "default_user_id")
+        if user_id == "default_user_id":
+            return "未指定用户ID"
+
+        user_memory_space = ("users_memory", user_id)
+
+        results = await store.asearch(user_memory_space, query=query ,limit=10)
+
+        if not results:
+            memories = "未查询到关于该问题的任何用户级记忆"
+        else:
+            for result in results:
+                memories = memories+ "key: "+ result.key + " content: " + result.value["data"] + "\n"
+
+        return memories
+
+    except Exception as e:
+        return "获取用户用户及记忆异常"
+
+@tool(name_or_callable="delete_user_memory")
+async def delete_user_memory(
+        keys:list[str],
+        config:RunnableConfig
+) -> str:
+    """
+    根据指定的 key 列表，批量删除用户级记忆。
+
+    该工具用于用户明确知道要删除哪些记忆时（例如用户说“删除我刚才提到的偏好”），
+    直接通过 key 精确定位并删除对应的记忆条目。
+    通常与 `get_user_memory` 或 `search_user_memory` 配合使用，
+    先获取记忆及其 key，再由用户选择删除。
+
+    Args:
+        keys (List[str]): 要删除的记忆 key 列表（时间戳字符串）。
+            例如：["20250101_120000", "20250102_143000"]。
+            用户可通过 `get_user_memory` 或 `search_user_memory` 获取所有记忆及其 key。
+        config (RunnableConfig): LangGraph 自动注入的运行时配置，包含 `configurable.user_id`，
+            用于确定当前用户的记忆命名空间。该参数由框架自动传入，调用时无需显式提供。
+
+    Returns:
+        str: 删除结果的汇总信息，包括成功删除的数量、失败的 key 及原因（若有）。
+
+    注意：
+        - 该工具直接执行删除操作，不会触发中断确认。如需确认，请在调用前由上层节点处理。
+        - 如果某个 key 不存在，会记录失败信息但不会中断整个删除流程。
+        - 删除操作不可恢复，请谨慎使用。
+    """
+    try:
+        store = get_store()
+
+        # 获取当前会话或用户的唯一标识符
+        user_id = config.get("configurable", {}).get("user_id", "default_user_id")
+        if user_id == "default_user_id":
+            return "未指定用户ID"
+
+        user_memory_space = ("users_memory", user_id)
+
+        if not keys:
+            return "未指定删除哪些记忆"
+
+        for key in keys:
+            await store.adelete(user_memory_space,key)
+
+        return "删除成功"
+
+    except Exception as e:
+        return "删除用户级记忆失败"
+
+
+
