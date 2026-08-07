@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     COMFYUI_WORKFLOW: str = "workflow.json"
     COMFYUI_SAVE_PATH: str ="../Aura-backend-server/docs/temp_images"
 
+    # ==================== tavily 配置 ======================
+    TAVILY_API_KEY: str
+
     # ==================== Pydantic 配置加载规则 ====================
     model_config = SettingsConfigDict(
         env_file=".env",
