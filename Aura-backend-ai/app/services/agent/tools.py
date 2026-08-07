@@ -5,9 +5,12 @@ from typing import List
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 from langgraph.config import get_store
+from sqlalchemy import text
 
+from app.core.tavily import tavily_client
+from app.db.mysql.session import AsyncSessionLocal
 from app.services.rag.rag_flow import rag_ask
-from app.tools.to_str import list_document_to_str
+from app.tools.to_str import list_document_to_str, format_tavily_response
 
 
 @tool(name_or_callable="search_knowledge_base")
@@ -248,5 +251,97 @@ async def delete_user_memory(
     except Exception as e:
         return "删除用户级记忆失败"
 
+@tool(name_or_callable="search_full_session_memory")
+async def search_full_session_memory(
+        query: str,
+        config: RunnableConfig
+) -> str:
+    """
+    在指定 Agent 的完整会话历史中搜索与关键词匹配的消息内容（后备检索）。
 
+    **重要提示**：
+    - 该工具基于关键词进行模糊匹配（`LIKE %...%`），因此 `query` 应包含用户可能说过的**确切词语或短语**，
+      而非自然语言问题。例如：应传入 "部署" 或 "报错 500"，而不是 "用户之前问过什么关于部署的问题？"。
+    - **该操作涉及数据库模糊查询（全表扫描），相对耗时**，且返回的大量历史消息会消耗较多 Token。
+    - **建议仅在当前对话上下文无法回答用户问题时调用**，作为“后备检索”手段。
+    - 如果用户的记忆已被压缩（`SummarizationNode` 处理过），可能无法检索到已压缩的完整原始内容，
+      仅能检索到当前仍保存在 `messages` 表中的消息。
 
+    **过滤条件**：
+    - 仅查询角色为 `human` 或 `assistant` 的消息。
+    - 按 `agent_id` 进行过滤（从 `config.configurable.agent_id` 中获取），确保只搜索该 Agent 相关的对话。
+    - **注意**：当前未按会话（`thread_id`）过滤，因此搜索结果可能包含该 Agent 下所有会话的历史消息。
+      如果未来需要限制在特定会话内，可调整查询条件。
+
+    Args:
+        query (str): 搜索关键词或短语，例如 "部署"、"报错"、"配置"。
+        config (RunnableConfig): LangGraph 自动注入的运行时配置，用于获取当前 Agent 的 `agent_id`。
+
+    Returns:
+        str: 匹配的消息内容列表，按时间倒序排列，最多 20 条。
+             如果没有匹配结果，返回 "未查询到任何相关记忆"。
+
+    注意：
+        - 仅返回 `content` 字段，不包含角色、时间等元数据。
+        - 模糊匹配基于 MySQL 的 `LIKE`，区分中英文但大小写不敏感（取决于数据库排序规则）。
+        - 返回结果可能不包含已压缩的摘要内容，因此建议在对话早期或未压缩前使用。
+    """
+    try:
+        async with AsyncSessionLocal() as db:
+            agent_id = config.get("configurable",{}).get("agent_id",-1)
+            if agent_id == -1:
+                return "未指定agent_id"
+
+            result = await db.execute(
+                text("""
+                     SELECT content
+                     FROM messages
+                     WHERE content LIKE :query
+                       AND role IN ('human', 'assistant')
+                       AND agent_id = :agent_id
+                     ORDER BY create_time DESC LIMIT 20
+                     """),
+                {"query": f"%{query}%", "agent_id": agent_id}
+            )
+
+            rows = result.mappings().fetchall()
+            if not rows:
+                return "未查询到任何相关记忆"
+            else:
+                memories = ""
+                for row in rows:
+                    memories = memories + row["content"] +"\n"
+
+                return memories
+
+    except Exception as e:
+        return "查询该会话的完整记忆工具调用异常"
+
+@tool(name_or_callable="web_search")
+async def web_search(query: str) -> str:
+    """
+    通过 Tavily 进行实时网络搜索，获取最新、准确的信息。
+
+    该工具专为 AI Agent 设计，返回结果经过提炼，包含标题、摘要和来源链接。
+    适用于需要获取实时新闻、最新事件、动态信息、外部知识或验证事实的场景。
+    当用户询问时效性强、超出模型知识截止日期或需要外部验证的问题时，
+    应优先考虑调用此工具。
+
+    Args:
+        query (str): 搜索关键词或问题。
+            应使用**简洁、核心的关键词**，而非冗长的自然语言描述。
+            例如：应传入 "LangGraph 2026 最新特性"，而不是 "你能告诉我 LangGraph 在 2026 年有哪些新功能吗？"。
+
+    Returns:
+        str: 格式化后的搜索结果字符串，每条结果包含标题、摘要和来源 URL。
+             如果没有找到结果，返回 "未找到相关搜索结果。"
+             如果搜索过程中发生异常，返回 "搜索失败：{具体错误信息}。"
+    """
+    try:
+        response = await tavily_client.search(query=query)
+        response_str = format_tavily_response(response)
+
+        return response_str
+
+    except Exception as e:
+        return "联网搜索工具异常"

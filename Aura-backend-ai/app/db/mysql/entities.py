@@ -79,6 +79,9 @@ class MessageEntity(Base):
     role = Column(String(20), nullable=False, comment="user / assistant / tool_confirm")
     content = Column(Text, nullable=True, comment="消息内容")
 
+    # ============== Human 消息独有 创建新的对话分支用 ==============
+    from_checkpoint_id = Column(String(255), nullable=True, comment="分支源快照ID（LangGraph checkpoint_id），仅role=human时有效，主分支为NULL")
+
     # ===== 工具确认专用字段（仅 tool_confirm 时有值） =====
     action = Column(String(20), nullable=True, comment="用户确认动作: approve / reject / edit")
     edited_content = Column(Text, nullable=True, comment="用户编辑后的新内容（仅 action='edit' 时有值）")

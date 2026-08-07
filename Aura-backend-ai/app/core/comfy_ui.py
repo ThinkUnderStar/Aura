@@ -1,5 +1,4 @@
 from comfyuiclient import ComfyUIClientAsync
-
 from app.core.config import settings
 
 comfy_ui_client = ComfyUIClientAsync(

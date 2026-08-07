@@ -72,6 +72,16 @@ public class Message {
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 
+    //============== Human 消息独有 创建新的对话分支用 =============
+    /**
+     * 分支源快照 ID（LangGraph checkpoint_id）
+     * <p>
+     * 仅当 role = 'human' 时有效，表示该 Human 消息是从哪个图状态快照创建的分支。
+     * 主分支为 NULL，子分支的 Human 消息指向分支起点的 checkpoint_id。
+     * 其他角色（assistant、tool_confirm）的该字段始终为 NULL。
+     */
+    private String fromCheckpointId;
+
     // ===== 工具确认专用字段（仅 tool_confirm 时有值） =====
     /**
      * 用户确认动作
