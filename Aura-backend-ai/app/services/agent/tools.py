@@ -338,7 +338,13 @@ async def web_search(query: str) -> str:
              如果搜索过程中发生异常，返回 "搜索失败：{具体错误信息}。"
     """
     try:
-        response = await tavily_client.search(query=query)
+        response = await tavily_client.search(
+            query=query,
+            search_depth="advanced",
+            max_results=5,
+            include_answer=True,
+            topic="general"
+        )
         response_str = format_tavily_response(response)
 
         return response_str
