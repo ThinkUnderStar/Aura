@@ -1,6 +1,6 @@
 from app.core.llm import chat_llm
 from app.services.agent.tools import search_knowledge_base, save_user_memory, get_user_memory, search_user_memory, \
-    delete_user_memory
+    delete_user_memory, search_full_session_memory, web_search
 
 chat_llm_with_tools = chat_llm.bind_tools([
     search_knowledge_base,
@@ -8,4 +8,6 @@ chat_llm_with_tools = chat_llm.bind_tools([
     get_user_memory,
     search_user_memory,
     delete_user_memory,
+    search_full_session_memory,
+    web_search,
 ])
