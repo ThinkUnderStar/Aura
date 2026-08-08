@@ -27,6 +27,11 @@ public class Agent {
     private LocalDateTime updateTime;
 
     /**
+     * 该agent使用的分支（默认为main分支）
+     */
+    private String branchPath;
+
+    /**
      * 乐观锁版本号
      * <p>
      * 插入时自动填充为 1，每次更新时自动 +1。

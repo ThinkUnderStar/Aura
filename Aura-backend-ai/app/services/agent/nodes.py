@@ -12,7 +12,7 @@ from app.services.agent.graph import State
 from app.services.agent.llm import chat_llm_with_tools
 from app.services.agent.prompts import SYSTEM_PROMPT_TEMPLATE
 from app.services.agent.tools import search_knowledge_base, save_user_memory, get_user_memory, search_user_memory, \
-    delete_user_memory
+    delete_user_memory, search_full_session_memory, web_search
 
 
 async def llm_node(state:State) -> State:
@@ -134,6 +134,14 @@ async def run_tool(state:State,config:RunnableConfig) -> State:
 
                     else:
                         result = "用户的选择异常，不符合规范"
+
+        #搜索该分支的完整会话记忆
+        elif tool_call["name"] == "search_full_session_memory":
+            result = await search_full_session_memory.ainvoke(tool_call["args"])
+
+        #联网搜索
+        elif tool_call["name"] == "web_search":
+            result = await  web_search.ainvoke(tool_call["args"])
 
         #过滤对不存在工具的调用
         else:

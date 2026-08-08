@@ -34,6 +34,7 @@ class AgentEntity(Base):
     user_id = Column(BigInteger, nullable=False, index=True, comment="所属用户ID")
     name = Column(String(100), nullable=True, default="新对话", comment="对话名称")
     status = Column(SmallInteger, nullable=True, default=1, index=True, comment="1-活跃 0-已归档")
+    branch_path = Column(String(255), nullable=False, default="main", comment="该agent使用的分支，默认main")
     create_time = Column(DateTime, nullable=True, server_default=func.now(), comment="创建时间")
     update_time = Column(DateTime, nullable=True, server_default=func.now(), onupdate=func.now(), comment="更新时间")
     version = Column(Integer, nullable=False, default=1, comment="乐观锁版本号")
