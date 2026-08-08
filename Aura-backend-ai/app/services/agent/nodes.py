@@ -1,10 +1,13 @@
 from typing import List
 
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import ToolMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.config import get_store
 from langgraph.constants import END
 from langgraph.types import Command, interrupt
+from langmem.short_term import SummarizationNode
+
+from app.core.llm import chat_llm, extractor_llm
 from app.services.agent.graph import State
 from app.services.agent.llm import chat_llm_with_tools
 from app.services.agent.prompts import SYSTEM_PROMPT_TEMPLATE
@@ -196,6 +199,17 @@ async def relevant_user_memories(state:State,config:RunnableConfig) -> State:
                 memories = memories + result.value["data"] + "\n"
 
     system_prompt = await SYSTEM_PROMPT_TEMPLATE.ainvoke({"memories": memories})
-    system_message = state.messages[0]
-    system_message.content = system_prompt
-    return {"messages": [system_message]}
+    old_system = state.messages[0]
+    new_system = SystemMessage(
+        content=system_prompt,
+        id=old_system.id  # 保留相同 id，触发覆盖
+    )
+    return {"messages": [new_system]}
+
+#创建压缩对话节点（减少Token消耗）
+summarization_node  = SummarizationNode(
+    token_counter=chat_llm.get_num_tokens_from_messages,
+    model=extractor_llm,
+    max_tokens_before_summary=4096,
+    max_summary_tokens=512
+)

@@ -5,9 +5,10 @@ from typing import List
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 from langgraph.config import get_store
-from sqlalchemy import text
+from sqlalchemy import select
 
 from app.core.tavily import tavily_client
+from app.db.mysql.entities import MessageEntity
 from app.db.mysql.session import AsyncSessionLocal
 from app.services.rag.rag_flow import rag_ask
 from app.tools.to_str import list_document_to_str, format_tavily_response
@@ -288,21 +289,30 @@ async def search_full_session_memory(
     """
     try:
         async with AsyncSessionLocal() as db:
+            #所属agent
             agent_id = config.get("configurable",{}).get("agent_id",-1)
             if agent_id == -1:
                 return "未指定agent_id"
 
-            result = await db.execute(
-                text("""
-                     SELECT content
-                     FROM messages
-                     WHERE content LIKE :query
-                       AND role IN ('human', 'assistant')
-                       AND agent_id = :agent_id
-                     ORDER BY create_time DESC LIMIT 20
-                     """),
-                {"query": f"%{query}%", "agent_id": agent_id}
-            )
+            branch_path: str = config.get("configurable", {}).get("branch_path", "main")
+            one_list = branch_path.split("/")
+            branch = ""
+            branch_list = []
+            for one in one_list:
+                if one == "main":
+                    branch = one
+                else:
+                    branch = branch + "/" + one
+                branch_list.append(branch)
+
+            stmt = select(MessageEntity.content).where(
+                MessageEntity.content.like(f"%{query}%"),
+                MessageEntity.role.in_(['human', 'assistant']),
+                MessageEntity.branch_path.in_(branch_list),
+                MessageEntity.agent_id == agent_id
+            ).order_by(MessageEntity.create_time.desc()).limit(20)
+
+            result = await db.execute(stmt)
 
             rows = result.mappings().fetchall()
             if not rows:
