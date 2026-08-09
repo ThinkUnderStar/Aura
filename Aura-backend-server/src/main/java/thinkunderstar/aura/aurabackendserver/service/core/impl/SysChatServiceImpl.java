@@ -3,7 +3,9 @@ package thinkunderstar.aura.aurabackendserver.service.core.impl;
 import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.stereotype.Service;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import thinkunderstar.aura.aurabackendserver.common.Result;
+import thinkunderstar.aura.aurabackendserver.dto.request.ChatDto;
 import thinkunderstar.aura.aurabackendserver.dto.response.MessageVODto;
 import thinkunderstar.aura.aurabackendserver.entity.Agent;
 import thinkunderstar.aura.aurabackendserver.exception.BusinessException;
@@ -53,8 +55,13 @@ public class SysChatServiceImpl implements SysChatService {
         }
 
         Page<MessageVODto> pageVO = new Page<>(page, size);
-        Page<MessageVODto> messageVODtoPage = messageMapper.selectMessageVODto(pageVO, agentId, agent.getBranchPath());
+        Page<MessageVODto> messageVODtoPage = messageMapper.selectMessageVODto(pageVO, agentId);
 
         return Result.success(messageVODtoPage);
+    }
+
+    @Override
+    public SseEmitter chatWithAgent(Long agentId, ChatDto chatDto) {
+
     }
 }

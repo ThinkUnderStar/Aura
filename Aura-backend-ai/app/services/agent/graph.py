@@ -29,7 +29,7 @@ graph.add_edge("summarization_node","llm_node")
 graph.add_edge("run_tool","summarization_node")
 
 #编译
-agent = graph.compile(
+aura_agent = graph.compile(
     checkpointer=checkpoint,
     store=store,
 )

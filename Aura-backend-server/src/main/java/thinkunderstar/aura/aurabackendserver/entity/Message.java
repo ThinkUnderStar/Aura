@@ -28,19 +28,6 @@ public class Message {
     private Long agentId;
 
     /**
-     * 分支路径，用于区分不同的对话分支
-     * <p>
-     * 格式说明：
-     * <ul>
-     *     <li>主分支：main</li>
-     *     <li>从主分支 step=3 处创建的分支：main/3</li>
-     *     <li>从 main/3 分支 step=2 处创建的分支：main/3/2</li>
-     * </ul>
-     * 默认值为 main
-     */
-    private String branchPath;
-
-    /**
      * 消息角色
      * <p>
      * 取值：user（用户）、assistant（助手）、tool_confirm（工具确认消息）

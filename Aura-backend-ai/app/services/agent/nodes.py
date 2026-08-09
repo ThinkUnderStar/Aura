@@ -188,6 +188,7 @@ async def relevant_user_memories(state:State,config:RunnableConfig) -> State:
         - 如果存储不支持或检索失败，会返回空记忆提示，不影响主流程。
         - 仅检索与当前问题最相关的 5 条记忆，以控制上下文长度。
     """
+    #获取与最新聊天相关的用户级记忆
     question = state.messages[-1].content
     store = get_store()
     memories = ""
@@ -206,7 +207,24 @@ async def relevant_user_memories(state:State,config:RunnableConfig) -> State:
             for result in results:
                 memories = memories + result.value["data"] + "\n"
 
-    system_prompt = await SYSTEM_PROMPT_TEMPLATE.ainvoke({"memories": memories})
+    #获取该agent绑定的相关知识库的信息
+    knowledge_bases = ""
+    knowledge_bases_list = config.get("configurable", {}).get("knowledge_bases", [])
+    if not knowledge_bases_list:
+        knowledge_bases = "当前没有绑定任何知识库，请根据自身知识回答用户的问题。"
+    else:
+        for knowledge_base in knowledge_bases_list:
+            knowledge_bases += (
+                f"知识库对应的向量数据库名: {kb.collection_name} "
+                f"该知识库的相关描述: {kb.description}\n"
+            )
+
+    #替换旧的systemMessage
+    system_prompt = await SYSTEM_PROMPT_TEMPLATE.ainvoke({
+        "memories": memories,
+        "knowledge_bases": knowledge_bases
+    })
+
     old_system = state.messages[0]
     new_system = SystemMessage(
         content=system_prompt,

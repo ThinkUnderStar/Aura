@@ -32,9 +32,8 @@ class AgentEntity(Base):
 
     id = Column(BigInteger, primary_key=True, autoincrement=True, comment="AgentID（对话ID）")
     user_id = Column(BigInteger, nullable=False, index=True, comment="所属用户ID")
-    name = Column(String(100), nullable=True, default="新对话", comment="对话名称")
+    name = Column(String(100), nullable=True, comment="对话名称")
     status = Column(SmallInteger, nullable=True, default=1, index=True, comment="1-活跃 0-已归档")
-    branch_path = Column(String(255), nullable=False, default="main", comment="该agent使用的分支，默认main")
     create_time = Column(DateTime, nullable=True, server_default=func.now(), comment="创建时间")
     update_time = Column(DateTime, nullable=True, server_default=func.now(), onupdate=func.now(), comment="更新时间")
     version = Column(Integer, nullable=False, default=1, comment="乐观锁版本号")
@@ -76,7 +75,6 @@ class MessageEntity(Base):
 
     id = Column(BigInteger, primary_key=True, autoincrement=True, comment="消息ID")
     agent_id = Column(BigInteger, nullable=False, index=True, comment="所属AgentID（对话ID）")
-    branch_path = Column(String(255), nullable=False, default="main", index=True, comment="分支路径，默认main")
     role = Column(String(20), nullable=False, comment="user / assistant / tool_confirm")
     content = Column(Text, nullable=True, comment="消息内容")
 

@@ -5,14 +5,11 @@ from typing import List
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 from langgraph.config import get_store
-from sqlalchemy import select
-
+import logging
 from app.core.tavily import tavily_client
-from app.db.mysql.entities import MessageEntity
-from app.db.mysql.session import AsyncSessionLocal
+from app.db.milvus.client import milvus_client
 from app.services.rag.rag_flow import rag_ask
 from app.tools.to_str import list_document_to_str, format_tavily_response
-
 
 @tool(name_or_callable="search_knowledge_base")
 async def search_knowledge_base(question: str, kbs_name: List[str]) -> str:
@@ -258,77 +255,67 @@ async def search_full_session_memory(
         config: RunnableConfig
 ) -> str:
     """
-    在指定 Agent 的完整会话历史中搜索与关键词匹配的消息内容（后备检索）。
+        在 Agent 的向量记忆库中语义搜索历史对话内容（后备检索）。
 
-    **重要提示**：
-    - 该工具基于关键词进行模糊匹配（`LIKE %...%`），因此 `query` 应包含用户可能说过的**确切词语或短语**，
-      而非自然语言问题。例如：应传入 "部署" 或 "报错 500"，而不是 "用户之前问过什么关于部署的问题？"。
-    - **该操作涉及数据库模糊查询（全表扫描），相对耗时**，且返回的大量历史消息会消耗较多 Token。
-    - **建议仅在当前对话上下文无法回答用户问题时调用**，作为“后备检索”手段。
-    - 如果用户的记忆已被压缩（`SummarizationNode` 处理过），可能无法检索到已压缩的完整原始内容，
-      仅能检索到当前仍保存在 `messages` 表中的消息。
+        该工具将 Agent 的完整会话历史存储在 Milvus 向量库中，通过语义相似度检索
+        查找与用户问题最相关的历史对话片段。相比 MySQL 的 `LIKE` 模糊匹配，
+        向量检索能理解语义相近的表达，召回率更高。
 
-    **过滤条件**：
-    - 仅查询角色为 `human` 或 `assistant` 的消息。
-    - 按 `agent_id` 进行过滤（从 `config.configurable.agent_id` 中获取），确保只搜索该 Agent 相关的对话。
-    - **注意**：当前未按会话（`thread_id`）过滤，因此搜索结果可能包含该 Agent 下所有会话的历史消息。
-      如果未来需要限制在特定会话内，可调整查询条件。
+        **核心机制**：
+        - 每个 Agent 拥有独立的 Milvus Collection：`aura_agent_{agent_id}_session_memory`
+        - 检索基于向量相似度（Cosine/Inner Product），而非关键词匹配
+        - 返回与 `query` 语义最相关的历史消息片段
 
-    Args:
-        query (str): 搜索关键词或短语，例如 "部署"、"报错"、"配置"。
-        config (RunnableConfig): LangGraph 自动注入的运行时配置，用于获取当前 Agent 的 `agent_id`。
+        **使用场景**：
+        - 用户询问“我之前有没有问过类似的问题？”
+        - 当前对话上下文无法回答，需要从历史对话中寻找线索
+        - 需要检索已压缩或被截断的历史记忆
 
-    Returns:
-        str: 匹配的消息内容列表，按时间倒序排列，最多 20 条。
-             如果没有匹配结果，返回 "未查询到任何相关记忆"。
+        **过滤条件**：
+        - 按 `agent_id` 隔离，只搜索该 Agent 自己的历史记忆
+        - 如果该 Agent 尚未创建向量记忆库，返回提示信息
 
-    注意：
-        - 仅返回 `content` 字段，不包含角色、时间等元数据。
-        - 模糊匹配基于 MySQL 的 `LIKE`，区分中英文但大小写不敏感（取决于数据库排序规则）。
-        - 返回结果可能不包含已压缩的摘要内容，因此建议在对话早期或未压缩前使用。
-    """
+        Args:
+            query (str): 搜索关键词或自然语言问题，例如 "部署"、"报错 500"、
+                "我之前问过什么关于配置的问题？"
+            config (RunnableConfig): LangGraph 自动注入的运行时配置，
+                需要包含 `agent_id`。
+
+        Returns:
+            str: 格式化的检索结果，按相关性排序，包含元数据和正文内容。
+                 如果该 Agent 没有向量记忆库，返回 "该agent并没有向量会话记忆库"。
+                 如果查询失败，返回空结果。
+
+        Note:
+            - 该工具依赖 Milvus 向量数据库，需确保 `milvus_client` 已正确初始化。
+            - Collection 命名规范为 `aura_agent_{agent_id}_session_memory`。
+            - 与 `search_user_memory` 的区别：
+                - `search_user_memory`：搜索用户级记忆（Store），跨 Agent 共享
+                - `search_full_session_memory`：搜索当前 Agent 的会话历史（Milvus）
+            - 建议作为后备检索手段，优先使用当前对话上下文。
+            - 如果 `agent_id` 未传入，返回错误提示。
+        """
     try:
-        async with AsyncSessionLocal() as db:
-            #所属agent
-            agent_id = config.get("configurable",{}).get("agent_id",-1)
-            if agent_id == -1:
-                return "未指定agent_id"
+        agent_id = config.get("configurable", {}).get("agent_id", -1)
+        if agent_id == -1:
+            return "未传入agent_id"
 
-            branch_path: str = config.get("configurable", {}).get("branch_path", "main")
-            one_list = branch_path.split("/")
-            branch = ""
-            branch_list = []
-            for one in one_list:
-                if one == "main":
-                    branch = one
-                else:
-                    branch = branch + "/" + one
-                branch_list.append(branch)
+        memory_collection_name = f"aura_agent_{agent_id}_session_memory"
+        if not milvus_client.has_collection(memory_collection_name):
+            logging.error(f"agent_{agent_id} 不存在向量记忆库")
+            return "该agent并没有向量会话记忆库"
 
-            stmt = select(MessageEntity.content).where(
-                MessageEntity.content.like(f"%{query}%"),
-                MessageEntity.role.in_(['human', 'assistant']),
-                MessageEntity.branch_path.in_(branch_list),
-                MessageEntity.agent_id == agent_id
-            ).order_by(MessageEntity.create_time.desc()).limit(20)
-
-            result = await db.execute(stmt)
-
-            rows = result.mappings().fetchall()
-            if not rows:
-                return "未查询到任何相关记忆"
-            else:
-                memories = ""
-                for row in rows:
-                    memories = memories + row["content"] +"\n"
-
-                return memories
+        results = await rag_ask(question=query,collection_name=memory_collection_name)
+        return list_document_to_str(results)
 
     except Exception as e:
-        return "查询该会话的完整记忆工具调用异常"
+        return "搜索该agent的全部会话记忆工具调用异常"
 
 @tool(name_or_callable="web_search")
-async def web_search(query: str) -> str:
+async def web_search(
+        query: str,
+        config: RunnableConfig
+) -> str:
     """
     通过 Tavily 进行实时网络搜索，获取最新、准确的信息。
 
@@ -341,6 +328,8 @@ async def web_search(query: str) -> str:
         query (str): 搜索关键词或问题。
             应使用**简洁、核心的关键词**，而非冗长的自然语言描述。
             例如：应传入 "LangGraph 2026 最新特性"，而不是 "你能告诉我 LangGraph 在 2026 年有哪些新功能吗？"。
+        config (RunnableConfig): LangGraph 自动注入的运行时配置，
+                需要包含 `enable_web_search`。
 
     Returns:
         str: 格式化后的搜索结果字符串，每条结果包含标题、摘要和来源 URL。
@@ -348,6 +337,10 @@ async def web_search(query: str) -> str:
              如果搜索过程中发生异常，返回 "搜索失败：{具体错误信息}。"
     """
     try:
+        enable_web_search = config.get("configurable", {}).get("enable_web_search", 0)
+        if enable_web_search == 0:
+            return "用户未开启联网搜索功能"
+
         response = await tavily_client.search(
             query=query,
             search_depth="advanced",
