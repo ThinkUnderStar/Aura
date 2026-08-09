@@ -3,7 +3,6 @@ import app.core.logging
 from app.api.v1.router import api_v1_router
 from app.db.mysql.session import Base, async_engine
 from app.db.postgresql.connect import postgresql_connect
-from app.services.agent.tools import web_search
 
 app = FastAPI(lifespan=postgresql_connect)
 

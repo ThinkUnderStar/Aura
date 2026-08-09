@@ -11,7 +11,6 @@ import java.time.LocalDateTime;
 public class MessageVODto {
     private Long id;
     private Long agentId;
-    private String branchPath;
     private String role;
     private String content;
     private LocalDateTime createTime;
