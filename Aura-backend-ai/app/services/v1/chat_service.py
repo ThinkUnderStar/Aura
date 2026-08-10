@@ -2,7 +2,9 @@ import json
 from typing import AsyncGenerator
 
 from langchain_core.messages import HumanMessage
+from langchain_core.runnables import RunnableConfig
 
+from app.db.postgresql.connect import checkpoint
 from app.models.request import ChatDto
 from app.services.agent.graph import graph, aura_agent
 
@@ -39,11 +41,22 @@ async def chat_with_agent_service(agent_id: int,chat_dto: ChatDto) -> AsyncGener
             - `error`: 错误信息，展示提示。
         - 中断确认后，前端需调用 `/resume` 接口继续对话。
     """
+    snapshot = await checkpoint.aget(RunnableConfig(
+        configurable={"thread_id": "aura-thread-"+str(agent_id)}
+    ))
+
+    if snapshot:
+        checkpoint_id = snapshot.config["configurable"]["checkpoint_id"]
+    else:
+        # 处理没有找到对应 checkpoint 的情况
+        checkpoint_id = None
+
     config = {
         "user_id": "aura-user-"+str(chat_dto.user_id),
         "thread_id": "aura-thread-"+str(agent_id),
         "agent_id": agent_id,
-        "knowledge_bases": chat_dto.knowledge_bases
+        "knowledge_bases": chat_dto.knowledge_bases,
+        "from_checkpoint_id": checkpoint_id,
     }
 
     # 创建异步生成器
@@ -52,7 +65,7 @@ async def chat_with_agent_service(agent_id: int,chat_dto: ChatDto) -> AsyncGener
         config=config,
         version="v3",
     )
-
+ 
     async for event in astream:
         if event["event"] == "on_chat_model_stream":
             content = event["data"]["chunk"]["content"]

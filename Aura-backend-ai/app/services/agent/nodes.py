@@ -1,18 +1,22 @@
+import logging
 from typing import List
 
 from langchain_core.messages import ToolMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.config import get_store
-from langgraph.constants import END
 from langgraph.types import Command, interrupt
 from langmem.short_term import SummarizationNode
 
 from app.core.llm import chat_llm, extractor_llm
+from app.db.mysql.entities import MessageEntity
+from app.db.mysql.session import AsyncSessionLocal
 from app.services.agent.graph import State
 from app.services.agent.llm import chat_llm_with_tools
 from app.services.agent.prompts import SYSTEM_PROMPT_TEMPLATE
 from app.services.agent.tools import search_knowledge_base, save_user_memory, get_user_memory, search_user_memory, \
     delete_user_memory, search_full_session_memory, web_search
+from app.services.rag.embedding import embed_memory
+from app.services.rag.vector_store import vector_store
 
 
 async def llm_node(state:State) -> State:
@@ -31,7 +35,7 @@ async def llm_node(state:State) -> State:
     else:
         return Command(
             update={"messages": response},
-            goto=END
+            goto="save_ai_session_memory"
         )
 
 async def run_tool(state:State,config:RunnableConfig) -> State:
@@ -215,8 +219,8 @@ async def relevant_user_memories(state:State,config:RunnableConfig) -> State:
     else:
         for knowledge_base in knowledge_bases_list:
             knowledge_bases += (
-                f"知识库对应的向量数据库名: {kb.collection_name} "
-                f"该知识库的相关描述: {kb.description}\n"
+                f"知识库对应的向量数据库名: {knowledge_base.collection_name} "
+                f"该知识库的相关描述: {knowledge_base.description}\n"
             )
 
     #替换旧的systemMessage
@@ -226,11 +230,19 @@ async def relevant_user_memories(state:State,config:RunnableConfig) -> State:
     })
 
     old_system = state.messages[0]
-    new_system = SystemMessage(
-        content=system_prompt,
-        id=old_system.id  # 保留相同 id，触发覆盖
-    )
-    return {"messages": [new_system]}
+    if isinstance(old_system,SystemMessage):
+        new_system = SystemMessage(
+            content=system_prompt,
+            id=old_system.id  # 保留相同 id，触发覆盖
+        )
+
+        return {"messages": [new_system]}
+    else:
+        new_system = SystemMessage(
+            content=system_prompt
+        )
+
+        return {"messages": [new_system] + state.messages}
 
 #创建压缩对话节点（减少Token消耗）
 summarization_node  = SummarizationNode(
@@ -239,3 +251,113 @@ summarization_node  = SummarizationNode(
     max_tokens_before_summary=4096,
     max_summary_tokens=512
 )
+
+async def save_human_session_memory(state: State,config: RunnableConfig) -> State:
+    """
+    保存当前轮次的人类用户消息到会话记忆存储（MySQL + Milvus）。
+
+    该节点在 LLM 节点之后执行，通常在图结束前运行。
+    它从 `state.messages` 中提取最新的 `HumanMessage`，并将其内容、时间戳、关联的 `agent_id`、`user_id` 等信息：
+    - 写入 MySQL 的 `messages` 表（供前端展示和历史查询）
+    - 写入 Milvus 的向量集合 `aura_agent_{agent_id}_session_memory`（供语义检索）
+
+    该节点只保存人类消息，不保存 AI 回复。如果需要同时保存 AI 回复，可扩展为同时保存。
+
+    Args:
+        state (State): 当前图状态，应包含 `messages` 列表，其中至少有一条 `HumanMessage`。
+        config (RunnableConfig): 运行时配置，必须包含：
+            - `configurable.agent_id`: Agent ID，用于确定 Milvus 集合名和 MySQL 关联。
+            - `configurable.user_id`: 用户 ID，用于标记消息归属（可选）。
+            - `configurable.thread_id`: 会话 ID（可选，用于日志）。
+
+    Returns:
+        State: 原状态（不变），因为本节点只执行外部写入操作，不修改 `state` 内容。
+        如果保存失败，会记录错误日志，但不影响图执行。
+
+    Note:
+        - 本节点假设 `state.messages` 中至少有一条 `HumanMessage`，否则跳过保存。
+        - Milvus 集合名格式为 `aura_agent_{agent_id}_session_memory`，需确保已创建。
+        - 如果 Milvus 写入失败，只会记录日志，不会回滚 MySQL 操作（非事务性）。
+        - 该节点不修改 `messages`，因此不会影响后续节点或 checkpoint。
+    """
+    agent_id = config.get("configurable", {}).get("agent_id", -1)
+    if agent_id == -1:
+        logging.error("config中未指定agent_id")
+        return state
+
+    memory_collection_name = f"aura_agent_{agent_id}_session_memory"
+    from_checkpoint_id = config.get("configurable", {}).get("from_checkpoint_id", "default_checkpoint_id")
+    if from_checkpoint_id == "default_checkpoint_id":
+        logging.error("config中未指定from_checkpoint_id")
+        return state
+
+    async with AsyncSessionLocal() as db:
+        #将HumanMessage的信息存入mysql中
+        message = MessageEntity(
+            content = state.messages[-1].content,
+            agent_id = agent_id,
+            role = "user",
+            from_checkpoint_id=from_checkpoint_id,
+        )
+        db.add(message)
+        await db.commit()
+        await db.refresh(message)
+
+     #将HumanMessage的信息存入用于完整记忆检索的milvus向量数据库中
+    embed_messages = await embed_memory(message.content,message)
+    await vector_store(embed_messages,memory_collection_name)
+
+    return state
+
+async def save_ai_session_memory(state: State,config: RunnableConfig) -> State:
+    """
+    保存当前轮次的 AI 回复消息到会话记忆存储（MySQL + Milvus）。
+
+    该节点在 LLM 节点之后执行，通常在图结束前运行。
+    它从 `state.messages` 中提取最新的 `AIMessage`，并将其内容、时间戳、关联的 `agent_id`、`user_id` 等信息：
+    - 写入 MySQL 的 `messages` 表（供前端展示和历史查询）
+    - 写入 Milvus 的向量集合 `aura_agent_{agent_id}_session_memory`（供语义检索）
+
+    该节点与 `save_human_session_memory` 配对使用，分别保存人类消息和 AI 回复。
+
+    Args:
+        state (State): 当前图状态，应包含 `messages` 列表，其中至少有一条 `AIMessage`。
+        config (RunnableConfig): 运行时配置，必须包含：
+            - `configurable.agent_id`: Agent ID，用于确定 Milvus 集合名和 MySQL 关联。
+            - `configurable.user_id`: 用户 ID，用于标记消息归属（可选）。
+            - `configurable.thread_id`: 会话 ID（可选，用于日志）。
+
+    Returns:
+        State: 原状态（不变），因为本节点只执行外部写入操作，不修改 `state` 内容。
+        如果保存失败，会记录错误日志，但不影响图执行。
+
+    Note:
+        - 本节点假设 `state.messages` 中至少有一条 `AIMessage`，否则跳过保存。
+        - 保存时，`role` 字段固定为 "assistant"。
+        - `from_checkpoint_id` 从 `config` 中获取，用于追溯会话来源。
+        - Milvus 集合名格式为 `aura_agent_{agent_id}_session_memory`，需确保已创建。
+        - 如果 Milvus 写入失败，只会记录日志，不会回滚 MySQL 操作（非事务性）。
+        - 该节点不修改 `messages`，因此不会影响后续节点或 checkpoint。
+    """
+    agent_id = config.get("configurable", {}).get("agent_id", -1)
+    if agent_id == -1:
+        logging.error("config中未指定agent_id")
+        return state
+    memory_collection_name = f"aura_agent_{agent_id}_session_memory"
+
+    async with AsyncSessionLocal() as db:
+        #将HumanMessage的信息存入mysql中
+        message = MessageEntity(
+            content = state.messages[-1].content,
+            agent_id = agent_id,
+            role = "assistant",
+        )
+        db.add(message)
+        await db.commit()
+        await db.refresh(message)
+
+     #将HumanMessage的信息存入用于完整记忆检索的milvus向量数据库中
+    embed_messages = await embed_memory(message.content,message)
+    await vector_store(embed_messages,memory_collection_name)
+
+    return state
