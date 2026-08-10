@@ -1,5 +1,8 @@
 package thinkunderstar.aura.aurabackendserver.dto.request;
 
+import lombok.Data;
+
+@Data
 public class ChatDto {
     //用户发给AI的消息
     private String humanContent;

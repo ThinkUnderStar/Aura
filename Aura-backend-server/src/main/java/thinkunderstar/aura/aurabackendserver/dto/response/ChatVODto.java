@@ -1,7 +1,10 @@
 package thinkunderstar.aura.aurabackendserver.dto.response;
 
+import lombok.Data;
+
 import java.util.List;
 
+@Data
 public class ChatVODto {
     private Long userId;
 
