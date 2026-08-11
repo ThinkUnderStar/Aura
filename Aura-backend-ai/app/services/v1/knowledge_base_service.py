@@ -1,3 +1,5 @@
+from pymilvus import FieldSchema, DataType, CollectionSchema
+
 from app.core.config import settings
 from app.db.milvus.client import milvus_client
 from app.models.response import Result
@@ -13,13 +15,32 @@ async def create_knowledge_base_service(kb_name: str) -> Result[None]:
         if await milvus_client.has_collection(kb_name):
            return Result.success(msg=f"知识库{kb_name}已存在")
 
+        fields = [
+            FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
+            FieldSchema(name="text", dtype=DataType.VARCHAR, max_length=4096),
+            FieldSchema(name="vector", dtype=DataType.FLOAT_VECTOR, dim=settings.MILVUS_DIMENSION),
+            FieldSchema(name="document_id", dtype=DataType.INT64),
+            FieldSchema(name="document_name", dtype=DataType.VARCHAR, max_length=255),
+            FieldSchema(name="metadata", dtype=DataType.VARCHAR, max_length=2048),  # JSON 字符串
+        ]
+        schema = CollectionSchema(fields, description="知识库文档向量集合")
+
         await milvus_client.create_collection(
             collection_name=kb_name,
-            dimension=settings.MILVUS_DIMENSION,
-            primary_field_name="id",
-            vector_field_name="vector",
-            metric_type="COSINE",
-            auto_id=True,
+            schema=schema
+        )
+
+        # 创建索引
+        index_params = {
+            "metric_type": "COSINE",
+            "index_type": "IVF_FLAT",  # 数据量小可改为 "FLAT"
+            "params": {"nlist": 128}
+        }
+
+        await milvus_client.create_index(
+            collection_name=kb_name,
+            field_name="vector",
+            index_params=index_params
         )
 
         return Result.success(msg=f"知识库{kb_name}创建成功")

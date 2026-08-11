@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Path, Body
 from starlette.responses import StreamingResponse
 
-from app.models.request import ChatDto
-from app.services.v1.chat_service import chat_with_agent_service
+from app.models.request import ChatDto, ToolAllowDto
+from app.services.v1.chat_service import chat_with_agent_service, tool_allow_service
 
 chat_router = APIRouter(prefix="/chat",tags=["agent"])
 
@@ -53,4 +53,55 @@ async def chat_with_agent(
     )
 
 
+@chat_router.post("/tool_allow")
+async def tool_allow(
+        tool_allow_dto: ToolAllowDto = Body(..., description="工具调用中断续接参数")
+) -> StreamingResponse:
+    """
+    用户确认或拒绝工具调用中断，继续执行 LangGraph 图。
 
+    当 Agent 在对话过程中触发 `interrupt`（例如询问是否保存用户级记忆），
+    前端会展示确认对话框，用户做出选择后，调用此接口将选择结果传回后端，
+    使中断的图从暂停处恢复执行，并继续流式返回 AI 响应。
+
+    **核心流程**：
+    1. 接收用户确认信息（`choice`）及可选的编辑内容（`edition`）。
+    2. 构建 `Command(resume=resume_value)`，其中 `resume_value` 包含 `choice` 和 `edition`。
+    3. 使用 `agent.ainvoke(Command(...), config)` 恢复图执行。
+    4. 将图执行产生的 SSE 流透传给前端。
+
+    **用户选择类型**：
+    - `"approve"`：同意工具调用，继续执行。
+    - `"reject"`：拒绝工具调用，图将处理拒绝逻辑。
+    - `"edit"`：用户编辑了内容，需同时传入 `edition` 字段（编辑后的新内容）。
+
+    Args:
+        tool_allow_dto (ToolAllowDto): 包含用户 ID、Agent ID、用户选择及可选编辑内容。
+
+    Returns:
+        StreamingResponse: 以 `text/event-stream` 格式返回恢复后的对话流，
+        前端通过 EventSource API 监听并实时渲染。
+
+    Raises:
+        HTTPException:
+            - 404: Agent 不存在或已删除。
+            - 403: 用户无权操作该 Agent。
+            - 400: 请求体缺失必填字段（如 `choice` 或 `choice` 为 `"edit"` 时缺少 `edition`）。
+            - 500: LangGraph 恢复执行失败（如状态异常、超时等）。
+
+    Note:
+        - 该接口需登录访问（SaToken 拦截）。
+        - 恢复执行时，`config` 中只需提供 `user_id`、`thread_id`（即 agent_id 字符串）和 `agent_id`。
+        - 中断恢复后，后续的 SSE 事件类型与正常对话一致（`text`、`interrupt`、`done` 等）。
+        - 如果 `choice` 为 `"edit"`，`edition` 必须为非空字符串，否则抛出异常。
+        - 该接口是幂等的：多次相同请求不会产生副作用（图状态由 checkpoint 管理）。
+    """
+    event_stream = tool_allow_service(tool_allow_dto)
+    return StreamingResponse(
+        event_stream,
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )

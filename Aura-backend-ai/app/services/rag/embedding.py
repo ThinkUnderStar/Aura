@@ -1,3 +1,4 @@
+import json
 import re
 from typing import List, Dict
 
@@ -35,7 +36,7 @@ async def embedding_docs(docs: List[Document],document: DocumentEntity) -> List[
                 "vector": e,
                 "document_id": document.id,
                 "document_name": document.file_name,
-                "metadata": docs[i].metadata
+                "metadata": json.dumps(docs[i].metadata)
             }
         )
         

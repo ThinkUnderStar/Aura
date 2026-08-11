@@ -9,6 +9,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
 import thinkunderstar.aura.aurabackendserver.common.Result;
 import thinkunderstar.aura.aurabackendserver.dto.request.BanUserDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.LoginDto;
@@ -46,7 +47,7 @@ public class AuthServiceImpl implements AuthService {
     private final WorkspaceMemberMapper workspaceMemberMapper;
     private final KnowledgeBaseMapper knowledgeBaseMapper;
     private final SysKnowledgeBaseService sysKnowledgeBaseService;
-    private final TransactionTemplate transactionTemplate;
+    private final WebClient webClient;
 
     public AuthServiceImpl(
             RedisTokenBucketLimiter redisTokenBucketLimiter,
@@ -57,8 +58,7 @@ public class AuthServiceImpl implements AuthService {
             WorkspaceMemberMapper workspaceMemberMapper,
             KnowledgeBaseMapper knowledgeBaseMapper,
             SysKnowledgeBaseService sysKnowledgeBaseService,
-            TransactionTemplate transactionTemplate
-    ) {
+            WebClient webClient) {
         this.redisTokenBucketLimiter = redisTokenBucketLimiter;
         this.httpServletRequest = httpServletRequest;
         this.userService = userService;
@@ -67,7 +67,7 @@ public class AuthServiceImpl implements AuthService {
         this.workspaceMemberMapper = workspaceMemberMapper;
         this.knowledgeBaseMapper = knowledgeBaseMapper;
         this.sysKnowledgeBaseService = sysKnowledgeBaseService;
-        this.transactionTemplate = transactionTemplate;
+        this.webClient = webClient;
     }
 
     @Override
@@ -368,23 +368,34 @@ public class AuthServiceImpl implements AuthService {
             }
         }
 
-        //删除该账号绑定的所有数据库
+        //删除该账号绑定的所有知识库
         knowledgeBaseMapper.selectList(
                 new LambdaQueryWrapper<KnowledgeBase>()
                         .eq(KnowledgeBase::getOwnerId,user.getId())
         ).forEach(knowledgeBase -> {
             try {
-                transactionTemplate.execute(status -> {
-                    sysKnowledgeBaseService.forceDeleteKnowledgeBase(Math.toIntExact(knowledgeBase.getId()));
-                    return null;
-                });
+                sysKnowledgeBaseService.forceDeleteKnowledgeBase(Math.toIntExact(knowledgeBase.getId()));
             }catch (Exception e){
                 log.error("知识库: "+knowledgeBase.getId()+" 删除失败");
             }
         });
 
-        //删除该账户帮的agent记忆
-        log.warn("接口未实现");
+        //删除该账户绑定的agent记忆
+        Result result = webClient.delete()
+                .uri(
+                        uriBuilder -> uriBuilder
+                                .path("/api/v1/agent/delete")
+                                .queryParam("user_id", user.getId())
+                                .build()
+                )
+                .retrieve()
+                .bodyToMono(Result.class)
+                .block();
+
+        if (result == null || result.getCode() != 200) {
+            log.error("清除该用户的所有agent记忆异常，可能有部分未清理完");
+            throw new BusinessException("删除该账户绑定的agent记忆异常");
+        }
 
         userService.removeById(user.getId());
     }

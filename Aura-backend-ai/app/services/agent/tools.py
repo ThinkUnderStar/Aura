@@ -301,7 +301,7 @@ async def search_full_session_memory(
             return "未传入agent_id"
 
         memory_collection_name = f"aura_agent_{agent_id}_session_memory"
-        if not milvus_client.has_collection(memory_collection_name):
+        if not (await milvus_client.has_collection(memory_collection_name)):
             logging.error(f"agent_{agent_id} 不存在向量记忆库")
             return "该agent并没有向量会话记忆库"
 
