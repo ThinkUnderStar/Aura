@@ -52,7 +52,7 @@ async def delete_document_service(kb_id: int,doc_id: int,db: AsyncSession) -> Re
         kb:Optional[KnowledgeBaseEntity] = (await db.execute(query_kb)).scalar_one_or_none()
         kb_name = f"aura_kb_{kb_id}_team" if kb.is_team == 1 else f"aura_kb_{kb_id}_personal"
 
-        milvus_client.delete(
+        await milvus_client.delete(
             collection_name=kb_name,
             filter=f"document_id=={doc_id}"
         )

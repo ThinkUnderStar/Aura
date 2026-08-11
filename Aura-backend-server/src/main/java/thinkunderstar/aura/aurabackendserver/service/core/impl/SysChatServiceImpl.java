@@ -4,13 +4,16 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import thinkunderstar.aura.aurabackendserver.common.Result;
 import thinkunderstar.aura.aurabackendserver.dto.request.ChatDto;
+import thinkunderstar.aura.aurabackendserver.dto.request.ToolAllowDto;
 import thinkunderstar.aura.aurabackendserver.dto.response.ChatVODto;
 import thinkunderstar.aura.aurabackendserver.dto.response.KnowledgeBaseVODto;
 import thinkunderstar.aura.aurabackendserver.dto.response.MessageVODto;
+import thinkunderstar.aura.aurabackendserver.dto.response.ToolAllowVODto;
 import thinkunderstar.aura.aurabackendserver.entity.Agent;
 import thinkunderstar.aura.aurabackendserver.entity.Message;
 import thinkunderstar.aura.aurabackendserver.exception.BusinessException;
@@ -112,7 +115,7 @@ public class SysChatServiceImpl implements SysChatService {
         if (message != null){
             if (message.getRole().equals("tool_confirm")){
                 throw new BusinessException("工具调用未确认，请确认后在发送信息");
-            } else if (message.getRole().equals("assistant")) {
+            } else if (message.getRole().equals("user")) {
                 throw new BusinessException("请在ai消息发完后，在发送新的对话");
             }
         }
@@ -135,7 +138,8 @@ public class SysChatServiceImpl implements SysChatService {
 
         chatVODto.setKnowledgeBases(knowledgeBases);
 
-        SseEmitter sseEmitter = new SseEmitter();
+        //向python端发送请求，并分装sse协议返回给前端
+        SseEmitter sseEmitter = new SseEmitter(120_000L);
         webClient.post()
                 .uri(uriBuilder -> uriBuilder
                         .path("/api/v1/chat/send/{agentId}")
@@ -144,8 +148,120 @@ public class SysChatServiceImpl implements SysChatService {
                 .bodyValue(chatVODto)
                 .retrieve()
                 .bodyToFlux(String.class)
+                .filter(response -> !response.trim().isEmpty())
                 .subscribe(
-                        response -> {},
-                )
+                        response -> {
+                            try {
+                                if (response.startsWith("data:")){
+                                    sseEmitter.send(response);
+                                } else if (response.startsWith("event: interrupt")) {
+
+                                    String interrupt_value_json = response.split("data:")[1].trim();
+                                    Message tool_message = new Message();
+                                    tool_message.setAgentId(agentId);
+                                    tool_message.setRole("tool_confirm");
+                                    tool_message.setContent(interrupt_value_json);
+                                    messageService.save(tool_message);
+
+                                    sseEmitter.send(response);
+                                }
+                            }catch (Exception e){
+                                sseEmitter.completeWithError(e);
+                            }
+                        },
+                        sseEmitter::completeWithError,
+                        sseEmitter::complete
+                );
+
+        return sseEmitter;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public SseEmitter toolAllow(Long agentId, ToolAllowDto toolAllowDto) {
+        if (agentId == null || toolAllowDto == null){
+            throw new BusinessException("工具调用确认接口的参数接收异常");
+        }
+
+        if (
+                toolAllowDto.getChoice() ==  null
+                        || !List.of("approve","reject","edit").contains(toolAllowDto.getChoice())
+        ) {
+            throw new BusinessException("工具调用接口，用户传入的choice值异常");
+        }
+
+        if (toolAllowDto.getChoice().equals("edit")
+                && (toolAllowDto.getEdition() == null ||  toolAllowDto.getEdition().trim().isEmpty())){
+            throw new BusinessException("edition内容不能为空");
+        }
+
+        //限流
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (!redisTokenBucketLimiter.tryAcquireByUser(String.valueOf(loginId), 20, 1)){
+            throw new BusinessException("工具调用过于频繁，请稍后再试");
+        }
+
+        //鉴权
+        Agent agent = agentService.getById(agentId);
+        if (agent == null || agent.getUserId() != loginId){
+            throw new BusinessException("您无权对该agent操作");
+        }
+
+        //异常调用过滤
+        Message message = messageService.getOne(
+                new LambdaQueryWrapper<Message>()
+                        .eq(Message::getAgentId, agentId)
+                        .orderByDesc(Message::getCreateTime)
+                        .last("limit 1")
+        );
+
+        if (message == null || !message.getRole().equals("tool_confirm")){
+            throw new BusinessException("只有工具调用确认才能调用该接口");
+        }
+
+        message.setAction(toolAllowDto.getChoice());
+        message.setEditedContent(toolAllowDto.getEdition());
+        messageService.updateById(message);
+
+        //封装body
+        ToolAllowVODto toolAllowVODto = new ToolAllowVODto();
+        toolAllowVODto.setUserId(loginId);
+        toolAllowVODto.setAgentId(agentId);
+        toolAllowVODto.setChoice(toolAllowDto.getChoice());
+        toolAllowVODto.setEdition(toolAllowDto.getEdition());
+
+        //封装sse协议
+        SseEmitter sseEmitter = new SseEmitter(120_000L);
+        webClient.post()
+                .uri("/api/v1/chat/tool_allow")
+                .bodyValue(toolAllowVODto)
+                .retrieve()
+                .bodyToFlux(String.class)
+                .filter(response -> !response.trim().isEmpty())
+                .subscribe(
+                        response -> {
+                            try {
+                                if (response.startsWith("data:")){
+                                    sseEmitter.send(response);
+                                } else if (response.startsWith("event: interrupt")) {
+
+                                    String interrupt_value_json = response.split("data:")[1].trim();
+                                    Message tool_message = new Message();
+                                    tool_message.setAgentId(agentId);
+                                    tool_message.setRole("tool_confirm");
+                                    tool_message.setContent(interrupt_value_json);
+                                    messageService.save(tool_message);
+
+                                    sseEmitter.send(response);
+                                }
+                            }catch (Exception e){
+                                sseEmitter.completeWithError(e);
+                            }
+                        },
+                        sseEmitter::completeWithError,
+                        sseEmitter::complete
+                );
+
+        return sseEmitter;
     }
 }

@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import thinkunderstar.aura.aurabackendserver.common.Result;
 import thinkunderstar.aura.aurabackendserver.dto.request.ChatDto;
+import thinkunderstar.aura.aurabackendserver.dto.request.ToolAllowDto;
 import thinkunderstar.aura.aurabackendserver.dto.response.MessageVODto;
 import thinkunderstar.aura.aurabackendserver.service.core.SysChatService;
 
@@ -90,6 +91,51 @@ public class SysChatController {
             @PathVariable Long agentId,
             @RequestBody ChatDto chatDto
     ) {
+        return sysChatService.chatWithAgent(agentId, chatDto);
+    }
 
+    /**
+     * 恢复工具调用中断，继续执行对话（SSE 流式响应）。
+     * <p>
+     * 当 Agent 在对话中触发中断（如询问是否保存用户级记忆）时，
+     * 前端会展示确认对话框，用户做出选择后调用此接口将选择结果传回，
+     * 使中断的图从暂停处恢复执行，并继续流式返回 AI 响应。
+     * <p>
+     * <b>调用流程</b>：
+     * <ol>
+     *   <li>前端展示中断对话框（如“是否保存记忆？”）</li>
+     *   <li>用户选择：approve / reject / edit（编辑后同意）</li>
+     *   <li>调用此接口，传递用户选择</li>
+     *   <li>Java 端透传给 Python 端，Python 端恢复 LangGraph 执行</li>
+     *   <li>恢复后的 SSE 流原样透传给前端</li>
+     * </ol>
+     * <p>
+     * <b>用户选择类型</b>：
+     * <ul>
+     *   <li>{@code approve}：同意工具调用，继续执行</li>
+     *   <li>{@code reject}：拒绝工具调用，图将处理拒绝逻辑</li>
+     *   <li>{@code edit}：用户编辑了内容，需同时提供 {@code edition} 字段</li>
+     * </ul>
+     *
+     * @param agentId        Agent ID（会话 ID），用于定位对话状态
+     * @param toolAllowDto   包含用户选择及可选编辑内容的请求体
+     * @return SseEmitter    SSE 流发射器，前端通过 EventSource 监听并实时渲染
+     *
+     * @apiNote 该接口需登录（SaToken 拦截），未登录返回 401
+     *          <br>当前接口只负责透传，不解析中断数据，所有业务逻辑由 Python 端处理
+     *          <br>前端应监听以下 SSE 事件：
+     *          <ul>
+     *            <li>{@code data: ...}：文本片段，直接追加显示</li>
+     *            <li>{@code event: interrupt}：新的中断事件（理论上恢复后不会再次触发，但保留）</li>
+     *            <li>{@code event: done}：对话结束，关闭连接</li>
+     *          </ul>
+     */
+    @PostMapping("/tool_allow/{agentId}")
+    @SaCheckLogin
+    public SseEmitter toolAllow(
+            @PathVariable Long agentId,
+            @RequestBody ToolAllowDto toolAllowDto
+    ) {
+        return sysChatService.toolAllow(agentId, toolAllowDto);
     }
 }

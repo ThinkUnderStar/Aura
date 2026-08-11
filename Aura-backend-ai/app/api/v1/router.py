@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.api.v1.agent_router import agent_router
 from app.api.v1.avatar_router import avatar_router
 from app.api.v1.chat_router import chat_router
 from app.api.v1.document_router import doc_router
@@ -12,3 +13,4 @@ api_v1_router.include_router(kb_router)
 api_v1_router.include_router(doc_router)
 api_v1_router.include_router(avatar_router)
 api_v1_router.include_router(chat_router)
+api_v1_router.include_router(agent_router)

@@ -6,8 +6,11 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.config import get_store
 from langgraph.types import Command, interrupt
 from langmem.short_term import SummarizationNode
+from pymilvus import DataType, FieldSchema, CollectionSchema
 
+from app.core.config import settings
 from app.core.llm import chat_llm, extractor_llm
+from app.db.milvus.client import milvus_client
 from app.db.mysql.entities import MessageEntity
 from app.db.mysql.session import AsyncSessionLocal
 from app.services.agent.graph import State
@@ -17,6 +20,7 @@ from app.services.agent.tools import search_knowledge_base, save_user_memory, ge
     delete_user_memory, search_full_session_memory, web_search
 from app.services.rag.embedding import embed_memory
 from app.services.rag.vector_store import vector_store
+from app.services.v1.knowledge_base_service import create_knowledge_base_service
 
 
 async def llm_node(state:State) -> State:
@@ -302,6 +306,30 @@ async def save_human_session_memory(state: State,config: RunnableConfig) -> Stat
         db.add(message)
         await db.commit()
         await db.refresh(message)
+
+    if not (await milvus_client.has_collection(collection_name=memory_collection_name)):
+        fields = [
+            FieldSchema(name="id", dtype=DataType.INT64, is_primary=True, auto_id=True),
+            FieldSchema(name="text", dtype=DataType.VARCHAR, max_length=4096),
+            FieldSchema(name="vector", dtype=DataType.FLOAT_VECTOR, dim=settings.MILVUS_DIMENSION),
+            FieldSchema(name="message_id", dtype=DataType.INT64),
+            FieldSchema(name="message_role", dtype=DataType.VARCHAR, max_length=20),
+            FieldSchema(name="create_time", dtype=DataType.VARCHAR, max_length=30),
+        ]
+        schema = CollectionSchema(fields, description="会话记忆向量集合")
+        await milvus_client.create_collection(memory_collection_name, schema=schema)
+
+        # 创建索引（必须）
+        index_params = {
+            "metric_type": "COSINE",
+            "index_type": "IVF_FLAT",
+            "params": {"nlist": 128}
+        }
+        await milvus_client.create_index(
+            collection_name=memory_collection_name,
+            field_name="vector",
+            index_params=index_params
+        )
 
      #将HumanMessage的信息存入用于完整记忆检索的milvus向量数据库中
     embed_messages = await embed_memory(message.content,message)
