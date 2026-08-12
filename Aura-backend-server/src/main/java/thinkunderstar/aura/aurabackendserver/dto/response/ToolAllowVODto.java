@@ -8,4 +8,5 @@ public class ToolAllowVODto {
     private long agentId;
     private String choice;
     private String edition;
+    private int enableWebSearch;
 }

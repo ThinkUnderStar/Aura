@@ -22,5 +22,10 @@ class ToolAllowDto(BaseModel):
     agent_id: int
     choice: str
     edition: str
+    enable_web_search: int
+
+class UpdateMessageDto(ChatDto):
+    from_checkpoint_id: str
+
 
 

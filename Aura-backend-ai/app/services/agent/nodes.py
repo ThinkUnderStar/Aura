@@ -20,7 +20,6 @@ from app.services.agent.tools import search_knowledge_base, save_user_memory, ge
     delete_user_memory, search_full_session_memory, web_search
 from app.services.rag.embedding import embed_memory
 from app.services.rag.vector_store import vector_store
-from app.services.v1.knowledge_base_service import create_knowledge_base_service
 
 
 async def llm_node(state:State) -> State:

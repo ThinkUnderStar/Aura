@@ -166,4 +166,44 @@ public class SysChatController {
     public Result<Void> clearSessionMessage(@PathVariable Long agentId) {
         return sysChatService.clearSessionMessage(agentId);
     }
+
+    /**
+     * 编辑指定消息的内容，并从该消息处回溯重新生成后续对话（流式响应）。
+     * <p>
+     * 该接口用于用户修改某条历史消息（通常是用户消息），然后系统会删除该消息之后的所有对话，
+     * 并基于修改后的内容重新执行 LangGraph 图，生成新的 AI 回复。
+     * <p>
+     * <b>核心流程</b>：
+     * <ol>
+     *   <li>校验消息归属和用户权限</li>
+     *   <li>更新消息内容（`content` 字段）</li>
+     *   <li>删除该消息之后的所有消息（MySQL 物理删除）</li>
+     *   <li>调用 Python 端回溯接口，将图状态恢复到该消息对应的 checkpoint</li>
+     *   <li>重新执行图（从该消息开始），以 SSE 流式返回新的 AI 回复</li>
+     * </ol>
+     * <p>
+     * <b>限流策略</b>：
+     * <ul>
+     *   <li><b>容量 (capacity)</b>：5（允许短时间内最多 5 次突发编辑请求）</li>
+     *   <li><b>速率 (rate)</b>：0.1（即每 10 秒允许 1 次请求，防止频繁编辑刷对话）</li>
+     * </ul>
+     *
+     * @param messageId 要编辑的消息 ID（路径参数）
+     * @param chatDto   包含新消息内容（`humanContent`）及可选配置（知识库、联网搜索等）
+     * @return SSE 流发射器，前端通过 EventSource 监听恢复后的实时响应
+     *
+     * @apiNote 该接口需登录（SaToken 拦截），未登录返回 401
+     *          <br>此操作会丢失该消息之后的所有对话历史，不可恢复，建议前端二次确认
+     *          <br>修改成功后，前端应刷新消息列表并展示新的流式响应
+     *          <br>传入的 ChatDto 中需包含完整的新消息内容，以及知识库绑定和联网搜索配置
+     */
+    @PutMapping("/update/{messageId}")
+    @SaCheckLogin
+    public SseEmitter updateMessage(
+            @PathVariable Long messageId,
+            @RequestBody ChatDto chatDto
+    ) {
+
+    }
+
 }
