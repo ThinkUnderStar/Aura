@@ -2,7 +2,8 @@ from fastapi import APIRouter, Path, Body
 from starlette.responses import StreamingResponse
 
 from app.models.request import ChatDto, ToolAllowDto
-from app.services.v1.chat_service import chat_with_agent_service, tool_allow_service
+from app.models.response import Result
+from app.services.v1.chat_service import chat_with_agent_service, tool_allow_service, clear_session_message_service
 
 chat_router = APIRouter(prefix="/chat",tags=["agent"])
 
@@ -105,3 +106,42 @@ async def tool_allow(
             "Connection": "keep-alive",
         }
     )
+
+@chat_router.delete("/clear/{agent_id}")
+async def clear_session_message(
+        agent_id: int = Path(...,description="该agent对应的ID")
+) -> Result[None]:
+    """
+    清空指定 Agent 的所有会话记忆（**不可恢复**）。
+
+    该接口会彻底删除该 Agent 在以下存储中的所有对话相关数据：
+    - **MySQL**：`messages` 表中该 Agent 的所有消息记录（包括 Human、AI 和工具确认消息）
+    - **PostgreSQL**：`checkpoints` 表中该 Agent 的所有状态快照（通过 LangGraph checkpointer）
+    - **Milvus**：该 Agent 对应的向量集合 `aura_agent_{agent_id}_session_memory`（若存在则删除）
+
+    执行后，该 Agent 将恢复到初始状态，所有历史对话、图执行状态和向量记忆均无法恢复。
+    建议前端在调用前展示二次确认弹窗，防止误操作。
+
+    Args:
+        agent_id (int): 要清空记忆的 Agent ID（路径参数）
+
+    Returns:
+        Result[None]: 统一封装的成功响应（data 为 None）
+            - 成功时返回 `{"code": 200, "message": "Agent 记忆已清除", "data": None}`
+            - 失败时返回对应的错误码和消息
+
+    Raises:
+        HTTPException:
+            - 404: Agent 不存在或无关联数据（但即使无数据，删除操作也是幂等的，不会报错）
+            - 500: 数据库操作失败、Milvus 删除失败或服务内部异常
+
+    Note:
+        - **幂等性**：该接口是幂等的，重复调用不会产生副作用（已删除的数据再次删除视为成功）。
+        - **跨存储一致性**：MySQL、PostgreSQL 和 Milvus 的删除操作不会在同一个事务中，
+          但整体删除逻辑是“尽力而为”，部分失败会记录日志并返回错误。
+        - **性能**：如果该 Agent 的消息量或向量数据量较大，删除操作可能需要几秒到几十秒，
+          建议客户端设置合理的超时时间。
+        - **与用户级记忆的关系**：该接口只删除 Agent 级别的会话记忆，不会影响用户级记忆（store 中按 `user_id` 隔离的数据）。
+        - **依赖服务**：该接口依赖 PostgreSQL checkpointer 和 Milvus 服务，请确保相关服务正常运行。
+    """
+    return await clear_session_message_service(agent_id)

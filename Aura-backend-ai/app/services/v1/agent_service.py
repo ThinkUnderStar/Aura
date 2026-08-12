@@ -12,7 +12,7 @@ from app.models.response import Result
 async def delete_user_agents_all_memory(
         user_id: int ,
         db: AsyncSession
-) -> Result[str]:
+) -> Result[None]:
     """
     删除指定用户下所有 Agent 的持久化记忆（**不可恢复**）。
 
@@ -51,7 +51,7 @@ async def delete_user_agents_all_memory(
         agents:List[AgentEntity] = (await db.execute(query)).scalars().all()
 
         if not agents:
-            return Result.success("该用户没有关联任何 Agent，无需清理")
+            return Result.success(msg="该用户没有关联任何 Agent，无需清理")
 
         for agent in agents:
             await checkpoint.adelete_thread("aura-thread-"+str(agent.id))
@@ -62,7 +62,7 @@ async def delete_user_agents_all_memory(
         for user_memory in user_memories:
             await store.adelete(user_memory_space,key=user_memory.key)
 
-        return Result.success("清除该用户的所有agent记忆成功")
+        return Result.success(msg="清除该用户的所有agent记忆成功")
 
     except Exception as e:
-        return Result.error("清除该用户的所有agent记忆异常，可能有部分未清理完")
+        return Result.error(msg="清除该用户的所有agent记忆异常，可能有部分未清理完")
