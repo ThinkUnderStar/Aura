@@ -138,4 +138,32 @@ public class SysChatController {
     ) {
         return sysChatService.toolAllow(agentId, toolAllowDto);
     }
+
+    /**
+     * 清空指定 Agent 的所有会话记忆（**不可恢复**）。
+     * <p>
+     * 该接口会删除该 Agent 在以下存储中的所有数据：
+     * <ul>
+     *   <li><b>MySQL</b>：`messages` 表中该 Agent 的所有对话消息（物理删除）</li>
+     *   <li><b>PostgreSQL</b>：`checkpoints` 表中该 Agent 的所有状态快照（通过 LangGraph checkpointer）</li>
+     *   <li><b>Milvus</b>：该 Agent 对应的向量集合（`aura_agent_{agentId}_session_memory`），释放存储空间</li>
+     * </ul>
+     * <p>
+     * 此操作会彻底清除该 Agent 的全部历史对话记录、图执行状态和向量记忆，
+     * 清空后该 Agent 将恢复为初始状态，无法恢复任何历史数据。
+     * 建议前端调用前展示二次确认弹窗。
+     *
+     * @param agentId Agent ID（路径参数），用于定位要清空的 Agent
+     * @return {@code Result.success()} 表示操作成功
+     *
+     * @apiNote 该接口需登录（SaToken 拦截），未登录返回 401
+     *          <br>操作幂等：重复调用不会报错（已删除的数据再次删除视为成功）
+     *          <br>由于涉及跨服务调用（Python 端），建议设置合理的超时时间
+     *          <br>成功响应仅表示操作已触发，具体清理结果需通过日志或状态查询确认
+     */
+    @DeleteMapping("/clear/{agentId}")
+    @SaCheckLogin
+    public Result<Void> clearSessionMessage(@PathVariable Long agentId) {
+        return sysChatService.clearSessionMessage(agentId);
+    }
 }

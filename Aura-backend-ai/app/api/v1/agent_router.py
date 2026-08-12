@@ -11,7 +11,7 @@ agent_router = APIRouter(prefix="/agent",tags=["Agent"])
 async def delete_user_agents_all_memory(
         user_id: int = Query(...,description="用户ID"),
         db: AsyncSession = Depends(get_db)
-) -> Result[str]:
+) -> Result[None]:
     """
     删除指定用户下所有 Agent 的持久化记忆（**不可恢复**）。
 

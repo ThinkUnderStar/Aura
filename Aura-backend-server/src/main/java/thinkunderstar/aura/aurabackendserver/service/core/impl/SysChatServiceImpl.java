@@ -264,4 +264,41 @@ public class SysChatServiceImpl implements SysChatService {
 
         return sseEmitter;
     }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Result<Void> clearSessionMessage(Long agentId) {
+        //接口参数检查
+        if (agentId == null){
+            throw new BusinessException("清空agent会话记录接口的参数接收异常");
+        }
+
+        //限流
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (!redisTokenBucketLimiter.tryAcquireByUser(String.valueOf(loginId), 5, 0.1)){
+            throw new BusinessException("清空agent的会话记录过于平凡，请稍后再试");
+        }
+
+        //鉴权
+        Agent agent = agentService.getById(agentId);
+        if (agent == null || agent.getUserId() != loginId){
+            throw new BusinessException("您无权清空该agent的会话记录");
+        }
+
+        //清空MySQL中存的会话记录
+        messageMapper.delete(new LambdaQueryWrapper<Message>().eq(Message::getAgentId, agentId));
+
+        //调用python端服务的接口，删除该agent的会话状态，和完整记忆库
+        Result result = webClient.delete()
+                .uri(uriBuilder -> uriBuilder.path("/api/v1/chat/clear/{agent_id}").build(agentId))
+                .retrieve()
+                .bodyToMono(Result.class)
+                .block();
+
+        if (result == null || result.getCode() != 200){
+            throw new BusinessException("会话记录删除异常");
+        }
+
+        return Result.success();
+    }
 }
