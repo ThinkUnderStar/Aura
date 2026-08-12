@@ -10,10 +10,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import thinkunderstar.aura.aurabackendserver.common.Result;
 import thinkunderstar.aura.aurabackendserver.dto.request.ChatDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.ToolAllowDto;
-import thinkunderstar.aura.aurabackendserver.dto.response.ChatVODto;
-import thinkunderstar.aura.aurabackendserver.dto.response.KnowledgeBaseVODto;
-import thinkunderstar.aura.aurabackendserver.dto.response.MessageVODto;
-import thinkunderstar.aura.aurabackendserver.dto.response.ToolAllowVODto;
+import thinkunderstar.aura.aurabackendserver.dto.response.*;
 import thinkunderstar.aura.aurabackendserver.entity.Agent;
 import thinkunderstar.aura.aurabackendserver.entity.Message;
 import thinkunderstar.aura.aurabackendserver.exception.BusinessException;
@@ -229,6 +226,7 @@ public class SysChatServiceImpl implements SysChatService {
         toolAllowVODto.setAgentId(agentId);
         toolAllowVODto.setChoice(toolAllowDto.getChoice());
         toolAllowVODto.setEdition(toolAllowDto.getEdition());
+        toolAllowVODto.setEnableWebSearch(toolAllowDto.getEnableWebSearch());
 
         //封装sse协议
         SseEmitter sseEmitter = new SseEmitter(120_000L);
@@ -300,5 +298,98 @@ public class SysChatServiceImpl implements SysChatService {
         }
 
         return Result.success();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public SseEmitter updateMessage(Long messageId, ChatDto chatDto) {
+        //参数接收检测
+        if (chatDto == null || messageId == null){
+            throw new BusinessException("回溯对话接口的参数接收异常");
+        }
+
+        if (chatDto.getHumanContent() == null ||  chatDto.getHumanContent().trim().isEmpty()){
+            throw new BusinessException("修改后的对话不能为空");
+        }
+
+        //限流
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (!redisTokenBucketLimiter.tryAcquireByUser(String.valueOf(loginId), 5, 0.1)){
+            throw new BusinessException("回溯对话过于频繁，请稍后再试");
+        }
+
+        //鉴权
+        Message message = messageService.getById(messageId);
+        if (message == null){
+            throw new BusinessException("您无权回溯该agent的对话");
+        }
+        Agent agent = agentService.getById(message.getAgentId());
+        if (agent == null || agent.getUserId() != loginId){
+            throw new BusinessException("您无权回溯该agent的对话");
+        }
+
+        if (!message.getRole().equals("user")) {
+            throw new BusinessException("只能修改用户的对话");
+        }
+
+        String fromCheckpointId = message.getFromCheckpointId();
+        //删除MySQL中回溯语句之后的message
+        messageMapper.delete(
+                new LambdaQueryWrapper<Message>()
+                        .ge(Message::getCreateTime,message.getCreateTime())
+        );
+
+        //封装请求体
+        MessageUpdateVODto messageUpdateVODto = new MessageUpdateVODto();
+        messageUpdateVODto.setHumanContent(chatDto.getHumanContent());
+        messageUpdateVODto.setUserId(loginId);
+        messageUpdateVODto.setEnableWebSearch(chatDto.getEnableWebSearch());
+        messageUpdateVODto.setFromCheckpointId(fromCheckpointId);
+
+        //获取绑定的知识库信息
+        List<Long> kbIds = agentKbBindingMapper.selectKbIdsByAgentId(agent.getId());
+        List<KnowledgeBaseVODto> knowledgeBases = knowledgeBaseMapper.selectByIds(kbIds)
+                .stream()
+                .map(knowledgeBase -> new KnowledgeBaseVODto(
+                        knowledgeBase.getCollectionName(),
+                        knowledgeBase.getDescription()
+                ))
+                .collect(Collectors.toList());
+
+        messageUpdateVODto.setKnowledgeBases(knowledgeBases);
+
+        //封装sse协议，并发送请求给python端
+        SseEmitter sseEmitter = new SseEmitter(120_000L);
+        webClient.post()
+                .uri(uriBuilder -> uriBuilder.path("/api/v1/chat/update/{message_id}").build(messageId))
+                .bodyValue(messageUpdateVODto)
+                .retrieve()
+                .bodyToFlux(String.class)
+                .filter(response -> !response.trim().isEmpty())
+                .subscribe(
+                        response -> {
+                            try {
+                                if (response.startsWith("data:")){
+                                    sseEmitter.send(response);
+                                } else if (response.startsWith("event: interrupt")) {
+
+                                    String interrupt_value_json = response.split("data:")[1].trim();
+                                    Message tool_message = new Message();
+                                    tool_message.setAgentId(agent.getId());
+                                    tool_message.setRole("tool_confirm");
+                                    tool_message.setContent(interrupt_value_json);
+                                    messageService.save(tool_message);
+
+                                    sseEmitter.send(response);
+                                }
+                            }catch (Exception e){
+                                sseEmitter.completeWithError(e);
+                            }
+                        },
+                        sseEmitter::completeWithError,
+                        sseEmitter::complete
+                );
+
+        return sseEmitter;
     }
 }

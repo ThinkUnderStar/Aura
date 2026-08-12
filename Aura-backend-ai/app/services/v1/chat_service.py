@@ -8,7 +8,7 @@ from langgraph.types import Command
 
 from app.db.milvus.client import milvus_client
 from app.db.postgresql.connect import checkpoint
-from app.models.request import ChatDto, ToolAllowDto
+from app.models.request import ChatDto, ToolAllowDto, UpdateMessageDto
 from app.models.response import Result
 from app.services.agent.graph import graph, aura_agent
 
@@ -61,6 +61,7 @@ async def chat_with_agent_service(agent_id: int,chat_dto: ChatDto) -> AsyncGener
         "agent_id": agent_id,
         "knowledge_bases": chat_dto.knowledge_bases,
         "from_checkpoint_id": checkpoint_id,
+        "enable_web_search": chat_dto.enable_web_search,
     }
 
     # 创建异步生成器
@@ -130,6 +131,7 @@ async def tool_allow_service(
         "user_id": "aura-user-" + str(tool_allow_dto.user_id),
         "thread_id": "aura-thread-" + str(tool_allow_dto.agent_id),
         "agent_id": tool_allow_dto.agent_id,
+        "enable_web_search": tool_allow_dto.enable_web_search,
     }
 
     astream = aura_agent.astream_events(
@@ -202,3 +204,54 @@ async def clear_session_message_service(
         logging.error(f"agent: {agent_id} 会话记录清空异常")
         return Result.error(msg="会话记录删除异常")
 
+async def update_message(
+        message_id: int,
+        update_message_dto: UpdateMessageDto
+) -> AsyncGenerator[str,None]:
+    """
+    修改指定消息的内容，并从该消息处重新执行图，返回异步生成器。
+
+    该函数用于用户编辑某条历史消息后，系统删除该消息及其之后的 MySQL 记录，
+    然后从对应的 checkpoint（或最新状态）恢复图执行，并将新内容作为输入重新生成后续对话。
+
+    **核心流程**：
+    1. 从 `update_message_dto` 中提取 `from_checkpoint_id`。
+    2. 如果 `from_checkpoint_id` 不为 `None`，则从该 checkpoint 恢复状态。
+    3. 如果 `from_checkpoint_id` 为 `None`，则先清空该 Agent 的所有记忆（PostgreSQL checkpoints + Milvus 集合），
+       然后以全新会话状态启动（相当于从头开始新对话）。
+    4. 将新内容作为 `HumanMessage` 输入，调用 `astream_events` 生成流式事件。
+    5. 逐块产出原始数据（文本片段或中断事件 JSON），由上层路由包装为 SSE。
+
+    **与 `chat_with_agent_service` 的区别**：
+    - `chat_with_agent_service`：从当前最新状态继续对话（常规场景）。
+    - `update_message`：从指定的历史 checkpoint 恢复，或清空状态后重新开始（修改消息场景）。
+
+    Args:
+        message_id (int): 要修改的消息 ID（由 Java 端传入，用于标识原消息，但本函数不直接操作 MySQL，
+            只使用其中的 `from_checkpoint_id` 进行状态恢复）。
+        update_message_dto (UpdateMessageDto): 包含以下字段：
+            - `user_id` (int): 用户 ID。
+            - `human_content` (str): 修改后的消息内容。
+            - `enable_web_search` (int): 是否开启联网搜索（1-开启，0-关闭）。
+            - `knowledge_bases` (List[KnowledgeBaseDto]): 知识库列表。
+            - `from_checkpoint_id` (str): 要恢复的 checkpoint ID（可为 None）。
+
+    Yields:
+        str: 图执行过程中产出的原始数据块（文本片段或中断事件 JSON 字符串），
+             不包含 SSE 格式包装（如 `data:` 前缀），由上层路由包装为 SSE。
+
+    Raises:
+        ValueError: 当 `from_checkpoint_id` 为 `None` 且清空记忆失败时（由内部服务抛出）。
+        Exception: LangGraph 执行过程中的其他异常。
+
+    Note:
+        - 本函数不操作 MySQL，MySQL 的删除和更新由 Java 端负责。
+        - 如果 `from_checkpoint_id` 为 `None`，会先清空该 Agent 的 PostgreSQL checkpoints 和 Milvus 集合，
+          确保状态一致。
+        - 恢复或清空后，图从 `llm_node` 继续执行（`relevant_user_memories` 不会重新运行，
+          但 `SystemMessage` 中的知识库和记忆信息已在首次对话时注入）。
+        - 该生成器产生的数据与 `chat_with_agent_service` 格式一致，
+          可直接交由 `StreamingResponse` 包装。
+    """
+    if update_message_dto.from_checkpoint_id == None:
+        await clear_session_message_service()

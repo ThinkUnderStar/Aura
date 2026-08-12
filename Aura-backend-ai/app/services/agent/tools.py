@@ -338,7 +338,7 @@ async def web_search(
     """
     try:
         enable_web_search = config.get("configurable", {}).get("enable_web_search", 0)
-        if enable_web_search == 0:
+        if enable_web_search != 1:
             return "用户未开启联网搜索功能"
 
         response = await tavily_client.search(

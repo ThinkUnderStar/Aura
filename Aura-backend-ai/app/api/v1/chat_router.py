@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Path, Body
 from starlette.responses import StreamingResponse
 
-from app.models.request import ChatDto, ToolAllowDto
+from app.models.request import ChatDto, ToolAllowDto, UpdateMessageDto
 from app.models.response import Result
 from app.services.v1.chat_service import chat_with_agent_service, tool_allow_service, clear_session_message_service
 
@@ -145,3 +145,58 @@ async def clear_session_message(
         - **依赖服务**：该接口依赖 PostgreSQL checkpointer 和 Milvus 服务，请确保相关服务正常运行。
     """
     return await clear_session_message_service(agent_id)
+
+@chat_router.put("/update/{message_id}")
+async def update_message(
+        message_id: int = Path(..., description="修改的message的ID"),
+        update_message_dto: UpdateMessageDto = Body(..., description="修改该message要用的信息")
+) -> StreamingResponse:
+    """
+    修改指定消息的内容，并从该消息处重新生成后续对话（SSE 流式响应）。
+
+    此接口用于用户编辑某条历史消息（例如修正错别字、调整问题描述），
+    系统会删除该消息之后的所有对话（包括 AI 回复、工具调用和确认消息），
+    用新内容替换原消息，然后从该消息处重新执行 LangGraph 图，流式返回新的 AI 响应。
+
+    **执行流程**：
+    1. 根据 `message_id` 查询原消息，校验是否属于当前用户且属于指定 Agent。
+    2. 获取原消息对应的 `from_checkpoint_id`（如果原消息为 Human 消息，则直接取；否则向上查找）。
+    3. 删除该消息之后的所有消息（MySQL 物理删除）。
+    4. 用 `update_message_dto.human_content` 更新该消息的内容。
+    5. 使用 `from_checkpoint_id` 构建 `config`，调用 Python 端流式接口重新执行图。
+    6. 将生成的 SSE 流透传给前端。
+
+    **限流策略**：
+    - 敏感操作，限流更严格：
+      - 突发容量：`5`
+      - 平均速率：`0.1` 次/秒（即每 10 秒最多 1 次）
+      - 防止用户频繁修改消息导致系统负担。
+
+    Args:
+        message_id (int): 要修改的消息 ID（路径参数）。
+        update_message_dto (UpdateMessageDto): 包含新消息内容、联网搜索开关、知识库列表及 `from_checkpoint_id` 的请求体。
+
+    Returns:
+        StreamingResponse: `text/event-stream` 格式的 SSE 流，前端通过 EventSource 监听。
+        事件类型：
+        - `data: <text>`：文本片段（逐字或逐块）
+        - `event: interrupt\n data: {...}`：中断确认（需要用户操作）
+        - `event: done`：对话结束
+
+    Raises:
+        HTTPException:
+            - 404: 消息不存在或不属于该 Agent
+            - 403: 用户无权修改该消息（需登录且为消息所属用户）
+            - 400: 请求体缺少 `from_checkpoint_id`（但已由 Pydantic 校验）
+            - 429: 请求频率超限（限流触发）
+            - 500: Python 端执行失败或内部异常
+
+    Note:
+        - 该操作会**不可逆地删除**该消息之后的所有消息，请前端在调用前务必让用户二次确认。
+        - `from_checkpoint_id` 必须为有效的 checkpoint ID，否则恢复失败。
+        - 修改成功后，该消息之后的旧对话将无法恢复，新对话从该消息处重新开始。
+        - 本接口需登录（SaToken 拦截），未登录返回 401。
+        - 修改后，`relevant_user_memories` 节点不会重新执行（因为图从 `llm_node` 恢复），
+          但 `SystemMessage` 中的知识库和记忆信息已在首次对话时注入，不会丢失。
+    """
+    pass
