@@ -190,6 +190,16 @@ class ReportEntity(Base):
     version = Column(Integer, nullable=False, default=1, comment="乐观锁版本号")
 
 
+class SensitiveWordEntity(Base):
+    """敏感词表"""
+    __tablename__ = "sensitive_words"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True, comment="敏感词ID")
+    word = Column(String(50), nullable=False, comment="敏感词")
+    type = Column(SmallInteger, nullable=False, default=2, comment="处理方式: 1-替换 2-直接拦截(默认)")
+    create_time = Column(DateTime, nullable=True, server_default=func.now(), comment="创建时间")
+
+
 class WorkspaceOperationLogEntity(Base):
     """工作空间操作日志表"""
     __tablename__ = "workspace_operation_logs"

@@ -19,6 +19,7 @@ import thinkunderstar.aura.aurabackendserver.exception.BusinessException;
 import thinkunderstar.aura.aurabackendserver.service.core.AuthService;
 import thinkunderstar.aura.aurabackendserver.service.core.SysUserService;
 import thinkunderstar.aura.aurabackendserver.service.wrapper.UserService;
+import thinkunderstar.aura.aurabackendserver.service.wrapper.impl.SensitiveWordManager;
 import thinkunderstar.aura.aurabackendserver.util.RedisTokenBucketLimiter;
 import thinkunderstar.aura.aurabackendserver.util.RedisUtils;
 import thinkunderstar.aura.aurabackendserver.util.ValidateUtils;
@@ -47,17 +48,19 @@ public class SysUserServiceImpl implements SysUserService {
     private final RedisUtils redisUtils;
     private final AuthService authService;
     private final WebClient webClient;
+    private final SensitiveWordManager sensitiveWordManager;
 
     public SysUserServiceImpl(
             RedisTokenBucketLimiter redisTokenBucketLimiter,
             UserService userService, RedisUtils redisUtils,
             AuthService authService,
-            WebClient webClient) {
+            WebClient webClient, SensitiveWordManager sensitiveWordManager) {
         this.redisTokenBucketLimiter = redisTokenBucketLimiter;
         this.userService = userService;
         this.redisUtils = redisUtils;
         this.authService = authService;
         this.webClient = webClient;
+        this.sensitiveWordManager = sensitiveWordManager;
     }
 
     @Override
@@ -179,6 +182,10 @@ public class SysUserServiceImpl implements SysUserService {
     public Result<String> generate(PromptDto promptDto) {
         if (promptDto == null || promptDto.getPrompt() == null) {
             throw new BusinessException("ai生成头像接口的提示词参数接收异常");
+        }
+
+        if (sensitiveWordManager.checkSensitiveWord(promptDto.getPrompt())) {
+            throw new BusinessException("描述中包含敏感词，无法生成相关头像");
         }
 
         long loginId = StpUtil.getLoginIdAsLong();

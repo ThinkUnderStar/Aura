@@ -20,6 +20,7 @@ import thinkunderstar.aura.aurabackendserver.mapper.KnowledgeBaseMapper;
 import thinkunderstar.aura.aurabackendserver.mapper.WorkspaceMemberMapper;
 import thinkunderstar.aura.aurabackendserver.service.core.SysKnowledgeBaseService;
 import thinkunderstar.aura.aurabackendserver.service.wrapper.*;
+import thinkunderstar.aura.aurabackendserver.service.wrapper.impl.SensitiveWordManager;
 import thinkunderstar.aura.aurabackendserver.util.RedisTokenBucketLimiter;
 
 import java.time.LocalDateTime;
@@ -41,6 +42,7 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
     private final WorkspaceOperationLogService workspaceOperationLogService;
     private final WorkspaceMemberService workspaceMemberService;
     private final WebClient webClient;
+    private final SensitiveWordManager sensitiveWordManager;
 
     public SysKnowledgeBaseServiceImpl(
             KnowledgeBaseService knowledgeBaseService,
@@ -49,7 +51,7 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
             WorkspaceMemberMapper workspaceMemberMapper,
             RedisTokenBucketLimiter redisTokenBucketLimiter,
             AgentKbBindingMapper agentKbBindingMapper,
-            TransactionTemplate transactionTemplate, UserService userService, WorkspaceOperationLogService workspaceOperationLogService, WorkspaceMemberService workspaceMemberService, WebClient webClient) {
+            TransactionTemplate transactionTemplate, UserService userService, WorkspaceOperationLogService workspaceOperationLogService, WorkspaceMemberService workspaceMemberService, WebClient webClient, SensitiveWordManager sensitiveWordManager) {
         this.knowledgeBaseService = knowledgeBaseService;
         this.knowledgeBaseMapper = knowledgeBaseMapper;
         this.workspaceService = workspaceService;
@@ -61,6 +63,7 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
         this.workspaceOperationLogService = workspaceOperationLogService;
         this.workspaceMemberService = workspaceMemberService;
         this.webClient = webClient;
+        this.sensitiveWordManager = sensitiveWordManager;
     }
 
     @Override
@@ -78,6 +81,14 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
 
         if (createKnowledgeBaseDto.getIsTeam() == null){
             throw new BusinessException("知识库是否从属团队参数失效");
+        }
+
+        if (sensitiveWordManager.checkSensitiveWord(createKnowledgeBaseDto.getName())) {
+            throw new BusinessException("知识库名中包含敏感词");
+        }
+
+        if (sensitiveWordManager.checkSensitiveWord(createKnowledgeBaseDto.getDescription())) {
+            throw new BusinessException("知识库描述中包含敏感词");
         }
 
         long loginId = StpUtil.getLoginIdAsLong();
@@ -474,6 +485,10 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
             throw new BusinessException("知识库的名字不能为空");
         }
 
+        if (sensitiveWordManager.checkSensitiveWord(name)) {
+            throw new BusinessException("知识库名中包含敏感词");
+        }
+
         if (name.equals(knowledgeBase.getName())){
             return Result.success(knowledgeBase);
         }
@@ -487,6 +502,10 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
     private Result<KnowledgeBase> updateKnowledgeBaseDescription(String description, KnowledgeBase knowledgeBase) {
         if (description == null || description.isEmpty()){
             throw new BusinessException("知识库的描述不能为空");
+        }
+
+        if (sensitiveWordManager.checkSensitiveWord(description)) {
+            throw new BusinessException("知识库描述中包含敏感词");
         }
 
         if (description.equals(knowledgeBase.getDescription())){
