@@ -1,4 +1,4 @@
-package thinkunderstar.aura.aurabackendserver.service.wrapper.impl;
+package thinkunderstar.aura.aurabackendserver.service.core.impl;
 
 import cn.hutool.dfa.WordTree;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;

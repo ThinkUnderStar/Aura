@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
 import thinkunderstar.aura.aurabackendserver.common.Result;
 import thinkunderstar.aura.aurabackendserver.dto.request.CreateKnowledgeBaseDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.UpdateKnowledgeBaseDto;
@@ -20,7 +19,6 @@ import thinkunderstar.aura.aurabackendserver.mapper.KnowledgeBaseMapper;
 import thinkunderstar.aura.aurabackendserver.mapper.WorkspaceMemberMapper;
 import thinkunderstar.aura.aurabackendserver.service.core.SysKnowledgeBaseService;
 import thinkunderstar.aura.aurabackendserver.service.wrapper.*;
-import thinkunderstar.aura.aurabackendserver.service.wrapper.impl.SensitiveWordManager;
 import thinkunderstar.aura.aurabackendserver.util.RedisTokenBucketLimiter;
 
 import java.time.LocalDateTime;

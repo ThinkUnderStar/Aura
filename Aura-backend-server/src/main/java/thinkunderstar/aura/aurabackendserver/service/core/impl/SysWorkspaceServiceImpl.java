@@ -27,7 +27,6 @@ import thinkunderstar.aura.aurabackendserver.mapper.WorkspaceOperationLogMapper;
 import thinkunderstar.aura.aurabackendserver.service.core.SysKnowledgeBaseService;
 import thinkunderstar.aura.aurabackendserver.service.core.SysWorkspaceService;
 import thinkunderstar.aura.aurabackendserver.service.wrapper.*;
-import thinkunderstar.aura.aurabackendserver.service.wrapper.impl.SensitiveWordManager;
 import thinkunderstar.aura.aurabackendserver.util.CodeUtils;
 import thinkunderstar.aura.aurabackendserver.util.RedisTokenBucketLimiter;
 
