@@ -1,7 +1,7 @@
 import logging
 from typing import List
 
-from langchain_core.messages import ToolMessage, SystemMessage
+from langchain_core.messages import ToolMessage, SystemMessage, AIMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.config import get_store
 from langgraph.types import Command, interrupt
@@ -388,3 +388,38 @@ async def save_ai_session_memory(state: State,config: RunnableConfig) -> State:
     await vector_store(embed_messages,memory_collection_name)
 
     return state
+
+async def sensitive_content_handler(state: State) -> State:
+    """
+    敏感词内容处理节点（硬编码返回）。
+
+    该节点在用户输入被 Java 端规则检查标记为敏感词（`is_sensitive == 1`）时触发，
+    作为图内分流后的终点节点之一。它不调用任何 LLM 或外部服务，
+    直接返回一条固定的警告消息给用户，避免敏感内容进入后续正常对话流程。
+
+    **核心职责**：
+    - 接收包含 `is_sensitive` 标记的状态。
+    - 构造并返回一条标准的敏感词警告消息（`AIMessage`）。
+    - 重置 `is_sensitive` 标记为 0，防止状态泄露或重复触发。
+
+    **执行位置**：
+    - 在图中的 `save_human_session_memory` 节点之后。
+    - 作为 `route_by_sensitive` 条件边的一个分支（`is_sensitive == 1` 分支）。
+    - 执行完成后，直接进入 `save_ai_session_memory` 节点（保存警告消息）。
+
+    Args:
+        state (State): 当前图状态，应包含 `is_sensitive` 字段（由 Java 端传入）。
+
+    Returns:
+        State: 更新后的状态，包含：
+            - `messages`: 追加了一条 `AIMessage`，内容为固定的敏感词警告。
+            - `is_sensitive`: 重置为 0，确保后续节点不再触发敏感词路由。
+
+    Note:
+        - 该节点不依赖任何外部服务，执行速度快（微秒级），适合作为兜底拦截路径。
+        - 警告消息内容为：`"您的输入内容包含敏感词，请修改后重新发送。"`
+        - 该节点不会产生流式事件，前端通过 `on_chain_end` 事件一次性接收到完整消息。
+        - 如果后续需要更精细的拦截策略（如 AI 复核），可在该节点前增加额外分支。
+    """
+    ai_message = AIMessage(content="根据相关规定，我无法回应您当前的问题。")
+    return {"messages": [ai_message]}

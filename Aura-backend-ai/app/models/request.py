@@ -18,6 +18,7 @@ class ChatDto(BaseModel):
     # 1-开启联网搜索 0-关闭联网搜搜
     enable_web_search: int
     knowledge_bases: List[KnowledgeBaseDto]
+    is_sensitive: int
 
 class ToolAllowDto(BaseModel):
     user_id: int

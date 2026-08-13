@@ -20,6 +20,7 @@ import thinkunderstar.aura.aurabackendserver.mapper.MessageMapper;
 import thinkunderstar.aura.aurabackendserver.service.core.SysChatService;
 import thinkunderstar.aura.aurabackendserver.service.wrapper.AgentService;
 import thinkunderstar.aura.aurabackendserver.service.wrapper.MessageService;
+import thinkunderstar.aura.aurabackendserver.service.wrapper.impl.SensitiveWordManager;
 import thinkunderstar.aura.aurabackendserver.util.RedisTokenBucketLimiter;
 
 import java.util.List;
@@ -34,8 +35,9 @@ public class SysChatServiceImpl implements SysChatService {
     private final WebClient webClient;
     private final KnowledgeBaseMapper knowledgeBaseMapper;
     private final AgentKbBindingMapper agentKbBindingMapper;
+    private final SensitiveWordManager sensitiveWordManager;
 
-    public SysChatServiceImpl(RedisTokenBucketLimiter redisTokenBucketLimiter, AgentService agentService, MessageMapper messageMapper, MessageService messageService, WebClient webClient, KnowledgeBaseMapper knowledgeBaseMapper, AgentKbBindingMapper agentKbBindingMapper) {
+    public SysChatServiceImpl(RedisTokenBucketLimiter redisTokenBucketLimiter, AgentService agentService, MessageMapper messageMapper, MessageService messageService, WebClient webClient, KnowledgeBaseMapper knowledgeBaseMapper, AgentKbBindingMapper agentKbBindingMapper, SensitiveWordManager sensitiveWordManager) {
         this.redisTokenBucketLimiter = redisTokenBucketLimiter;
         this.agentService = agentService;
         this.messageMapper = messageMapper;
@@ -43,6 +45,7 @@ public class SysChatServiceImpl implements SysChatService {
         this.webClient = webClient;
         this.knowledgeBaseMapper = knowledgeBaseMapper;
         this.agentKbBindingMapper = agentKbBindingMapper;
+        this.sensitiveWordManager = sensitiveWordManager;
     }
 
     @Override
@@ -122,6 +125,11 @@ public class SysChatServiceImpl implements SysChatService {
         chatVODto.setUserId(loginId);
         chatVODto.setHumanContent(chatDto.getHumanContent());
         chatVODto.setEnableWebSearch(chatDto.getEnableWebSearch());
+        if (sensitiveWordManager.checkSensitiveWord(chatVODto.getHumanContent())){
+            chatVODto.setIsSensitive(1);
+        }else {
+            chatVODto.setIsSensitive(0);
+        }
 
         //获取绑定的知识库信息
         List<Long> kbIds = agentKbBindingMapper.selectKbIdsByAgentId(agentId);
@@ -345,6 +353,11 @@ public class SysChatServiceImpl implements SysChatService {
         messageUpdateVODto.setUserId(loginId);
         messageUpdateVODto.setEnableWebSearch(chatDto.getEnableWebSearch());
         messageUpdateVODto.setMessage(message);
+        if (sensitiveWordManager.checkSensitiveWord(chatDto.getHumanContent())){
+            messageUpdateVODto.setIsSensitive(1);
+        }else {
+            messageUpdateVODto.setIsSensitive(0);
+        }
 
         //获取绑定的知识库信息
         List<Long> kbIds = agentKbBindingMapper.selectKbIdsByAgentId(agent.getId());

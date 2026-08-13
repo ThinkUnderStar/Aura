@@ -27,6 +27,7 @@ import thinkunderstar.aura.aurabackendserver.mapper.WorkspaceOperationLogMapper;
 import thinkunderstar.aura.aurabackendserver.service.core.SysKnowledgeBaseService;
 import thinkunderstar.aura.aurabackendserver.service.core.SysWorkspaceService;
 import thinkunderstar.aura.aurabackendserver.service.wrapper.*;
+import thinkunderstar.aura.aurabackendserver.service.wrapper.impl.SensitiveWordManager;
 import thinkunderstar.aura.aurabackendserver.util.CodeUtils;
 import thinkunderstar.aura.aurabackendserver.util.RedisTokenBucketLimiter;
 
@@ -52,6 +53,7 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
     private final TransactionTemplate transactionTemplate;
     private final WorkspaceOperationLogMapper workspaceOperationLogMapper;
     private final KnowledgeBaseService knowledgeBaseService;
+    private final SensitiveWordManager sensitiveWordManager;
 
     public SysWorkspaceServiceImpl(
             WorkspaceMapper workspaceMapper,
@@ -59,7 +61,7 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
             WorkspaceService workspaceService,
             SysKnowledgeBaseService sysKnowledgeBaseService,
             WorkspaceMemberService workspaceMemberService,
-            WorkspaceMemberMapper workspaceMemberMapper, UserService userService, WorkspaceOperationLogService workspaceOperationLogService, TransactionTemplate transactionTemplate, WorkspaceOperationLogMapper workspaceOperationLogMapper, KnowledgeBaseService knowledgeBaseService) {
+            WorkspaceMemberMapper workspaceMemberMapper, UserService userService, WorkspaceOperationLogService workspaceOperationLogService, TransactionTemplate transactionTemplate, WorkspaceOperationLogMapper workspaceOperationLogMapper, KnowledgeBaseService knowledgeBaseService, SensitiveWordManager sensitiveWordManager) {
         this.workspaceMapper = workspaceMapper;
         this.redisTokenBucketLimiter = redisTokenBucketLimiter;
         this.workspaceService = workspaceService;
@@ -71,6 +73,7 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
         this.transactionTemplate = transactionTemplate;
         this.workspaceOperationLogMapper = workspaceOperationLogMapper;
         this.knowledgeBaseService = knowledgeBaseService;
+        this.sensitiveWordManager = sensitiveWordManager;
     }
 
     @Override
@@ -107,12 +110,28 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
             throw new BusinessException("团队名不能为空");
         }
 
+        if (sensitiveWordManager.checkSensitiveWord(workspaceDto.getName())) {
+            throw new BusinessException("团队名中包含敏感词");
+        }
+
         if (workspaceDto.getKbName() == null || workspaceDto.getKbName().isEmpty()) {
             throw new BusinessException("团队知识库名不能为空");
         }
 
+        if (sensitiveWordManager.checkSensitiveWord(workspaceDto.getKbName())) {
+            throw new BusinessException("知识库名中包含敏感词");
+        }
+
         if (workspaceDto.getKbDescription() == null || workspaceDto.getKbDescription().isEmpty()) {
             throw new BusinessException("团队知识库描述不能为空");
+        }
+
+        if (sensitiveWordManager.checkSensitiveWord(workspaceDto.getKbDescription())) {
+            throw new BusinessException("知识库描述中包含敏感词");
+        }
+
+        if (workspaceDto.getDescription() != null && sensitiveWordManager.checkSensitiveWord(workspaceDto.getDescription())) {
+            throw new BusinessException("团队描述中包含敏感词");
         }
 
         long loginId = StpUtil.getLoginIdAsLong();
@@ -696,6 +715,10 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
         Integer role = StpUtil.getLoginIdAsLong() == workspace.getOwnerId() ? 0 : 1;
         WorkspaceVODto workspaceVODto = new WorkspaceVODto();
 
+        if (description != null && sensitiveWordManager.checkSensitiveWord(description)) {
+            throw new BusinessException("团队描述中包含敏感词");
+        }
+
         if (
                 (description == null && workspace.getDescription() == null)
                         || (
@@ -734,6 +757,10 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
     private Result<WorkspaceVODto> updateWorkspaceName(Workspace workspace, String name) {
         if (name == null || name.isEmpty()) {
             throw new BusinessException("团队名不能为空");
+        }
+
+        if (sensitiveWordManager.checkSensitiveWord(name)) {
+            throw new BusinessException("团队名中包含敏感词");
         }
 
         Integer role = StpUtil.getLoginIdAsLong() == workspace.getOwnerId() ? 0 : 1;

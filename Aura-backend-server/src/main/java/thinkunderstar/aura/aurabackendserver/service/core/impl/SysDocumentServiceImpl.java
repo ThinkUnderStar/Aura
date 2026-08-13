@@ -18,6 +18,7 @@ import thinkunderstar.aura.aurabackendserver.exception.BusinessException;
 import thinkunderstar.aura.aurabackendserver.mapper.DocumentMapper;
 import thinkunderstar.aura.aurabackendserver.service.core.SysDocumentService;
 import thinkunderstar.aura.aurabackendserver.service.wrapper.*;
+import thinkunderstar.aura.aurabackendserver.service.wrapper.impl.SensitiveWordManager;
 import thinkunderstar.aura.aurabackendserver.util.RedisTokenBucketLimiter;
 
 import java.io.File;
@@ -39,8 +40,9 @@ public class SysDocumentServiceImpl implements SysDocumentService {
     private final WorkspaceOperationLogService workspaceOperationLogService;
     private final DocumentMapper documentMapper;
     private final WebClient webClient;
+    private final SensitiveWordManager sensitiveWordManager;
 
-    public SysDocumentServiceImpl(RedisTokenBucketLimiter redisTokenBucketLimiter, KnowledgeBaseService knowledgeBaseService, WorkspaceService workspaceService, WorkspaceMemberService workspaceMemberService, DocumentService documentService, UserService userService, WorkspaceOperationLogService workspaceOperationLogService, DocumentMapper documentMapper, WebClient webClient) {
+    public SysDocumentServiceImpl(RedisTokenBucketLimiter redisTokenBucketLimiter, KnowledgeBaseService knowledgeBaseService, WorkspaceService workspaceService, WorkspaceMemberService workspaceMemberService, DocumentService documentService, UserService userService, WorkspaceOperationLogService workspaceOperationLogService, DocumentMapper documentMapper, WebClient webClient, SensitiveWordManager sensitiveWordManager) {
         this.redisTokenBucketLimiter = redisTokenBucketLimiter;
         this.knowledgeBaseService = knowledgeBaseService;
         this.workspaceService = workspaceService;
@@ -50,6 +52,7 @@ public class SysDocumentServiceImpl implements SysDocumentService {
         this.workspaceOperationLogService = workspaceOperationLogService;
         this.documentMapper = documentMapper;
         this.webClient = webClient;
+        this.sensitiveWordManager = sensitiveWordManager;
     }
 
     @Override
@@ -80,6 +83,10 @@ public class SysDocumentServiceImpl implements SysDocumentService {
         String ext = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
         if (!List.of("docx","pdf","txt","md").contains(ext)){
             throw new BusinessException("暂时只支持上传docx,pdf,txt,md格式的文件");
+        }
+
+        if (sensitiveWordManager.checkSensitiveWord(fileName)) {
+            throw new BusinessException("文件名中包含敏感词");
         }
 
         //限流模块

@@ -203,7 +203,7 @@ public class SysChatController {
             @PathVariable Long messageId,
             @RequestBody ChatDto chatDto
     ) {
-
+        return sysChatService.updateMessage(messageId, chatDto);
     }
 
 }

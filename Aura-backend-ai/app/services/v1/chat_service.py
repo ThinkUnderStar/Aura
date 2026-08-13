@@ -62,6 +62,7 @@ async def chat_with_agent_service(agent_id: int,chat_dto: ChatDto) -> AsyncGener
         "knowledge_bases": chat_dto.knowledge_bases,
         "from_checkpoint_id": checkpoint_id,
         "enable_web_search": chat_dto.enable_web_search,
+        "is_sensitive": chat_dto.is_sensitive
     }
 
     # 创建异步生成器
@@ -83,6 +84,10 @@ async def chat_with_agent_service(agent_id: int,chat_dto: ChatDto) -> AsyncGener
             value_json = json.dumps(value)
 
             yield f"event: interrupt\ndata: {value_json}\n\n"
+
+        if event["event"] == "on_chain_end" and event["name"] == "sensitive_content_handler":
+            content = event["data"]["output"]["messages"][0]["content"]
+            yield f"data: {content}\n\n"
 
 
 async def tool_allow_service(
@@ -268,6 +273,7 @@ async def update_message_service(
         "from_checkpoint_id": update_message_dto.message.from_checkpoint_id,
         "enable_web_search": update_message_dto.enable_web_search,
         "checkpoint_id": update_message_dto.message.from_checkpoint_id,
+        "is_sensitive": update_message_dto.is_sensitive
     }
 
     astream = aura_agent.astream_events(
@@ -288,6 +294,11 @@ async def update_message_service(
             value_json = json.dumps(value)
 
             yield f"event: interrupt\ndata: {value_json}\n\n"
+
+        if event["event"] == "on_chain_end" and event["name"] == "sensitive_content_handler":
+            content = event["data"]["output"]["messages"][0]["content"]
+            yield f"data: {content}\n\n"
+
 
 
 
