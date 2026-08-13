@@ -2,6 +2,8 @@ from typing import List
 
 from pydantic import BaseModel
 
+from app.db.mysql.entities import MessageEntity
+
 
 class PromptDto(BaseModel):
     prompt: str
@@ -25,7 +27,6 @@ class ToolAllowDto(BaseModel):
     enable_web_search: int
 
 class UpdateMessageDto(ChatDto):
-    from_checkpoint_id: str
-
+    message: MessageEntity
 
 

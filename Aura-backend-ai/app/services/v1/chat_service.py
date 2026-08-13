@@ -204,54 +204,90 @@ async def clear_session_message_service(
         logging.error(f"agent: {agent_id} 会话记录清空异常")
         return Result.error(msg="会话记录删除异常")
 
-async def update_message(
-        message_id: int,
+async def update_message_service(
         update_message_dto: UpdateMessageDto
 ) -> AsyncGenerator[str,None]:
     """
     修改指定消息的内容，并从该消息处重新执行图，返回异步生成器。
 
-    该函数用于用户编辑某条历史消息后，系统删除该消息及其之后的 MySQL 记录，
-    然后从对应的 checkpoint（或最新状态）恢复图执行，并将新内容作为输入重新生成后续对话。
+    该函数用于用户编辑某条历史消息后，从对应的 checkpoint 恢复图状态，
+    并将新内容作为输入重新生成后续对话。MySQL 中的消息删除和更新由 Java 端负责，
+    本函数只专注于图的状态恢复和流式事件生成。
 
     **核心流程**：
-    1. 从 `update_message_dto` 中提取 `from_checkpoint_id`。
+    1. 从 `update_message_dto.message`（MessageEntity）中提取 `from_checkpoint_id` 和 `agent_id`。
     2. 如果 `from_checkpoint_id` 不为 `None`，则从该 checkpoint 恢复状态。
-    3. 如果 `from_checkpoint_id` 为 `None`，则先清空该 Agent 的所有记忆（PostgreSQL checkpoints + Milvus 集合），
+    3. 如果 `from_checkpoint_id` 为 `None`，则先清空该 Agent 的所有持久化记忆（PostgreSQL checkpoints + Milvus 集合），
        然后以全新会话状态启动（相当于从头开始新对话）。
-    4. 将新内容作为 `HumanMessage` 输入，调用 `astream_events` 生成流式事件。
-    5. 逐块产出原始数据（文本片段或中断事件 JSON），由上层路由包装为 SSE。
+    4. 使用 `update_message_dto.human_content` 作为新的 `HumanMessage` 输入，调用 `astream_events`。
+    5. 逐块产出事件数据（文本片段或中断 JSON），由上层路由包装为 SSE 格式。
 
     **与 `chat_with_agent_service` 的区别**：
     - `chat_with_agent_service`：从当前最新状态继续对话（常规场景）。
     - `update_message`：从指定的历史 checkpoint 恢复，或清空状态后重新开始（修改消息场景）。
 
     Args:
-        message_id (int): 要修改的消息 ID（由 Java 端传入，用于标识原消息，但本函数不直接操作 MySQL，
-            只使用其中的 `from_checkpoint_id` 进行状态恢复）。
-        update_message_dto (UpdateMessageDto): 包含以下字段：
-            - `user_id` (int): 用户 ID。
-            - `human_content` (str): 修改后的消息内容。
+        update_message_dto (UpdateMessageDto): 包含以下字段的请求 DTO：
+            - `message` (MessageEntity): 原消息对象（包含 `id`、`agent_id`、`from_checkpoint_id`、`content` 等）。
+            - `human_content` (str): 修改后的新消息内容。
             - `enable_web_search` (int): 是否开启联网搜索（1-开启，0-关闭）。
             - `knowledge_bases` (List[KnowledgeBaseDto]): 知识库列表。
-            - `from_checkpoint_id` (str): 要恢复的 checkpoint ID（可为 None）。
 
     Yields:
         str: 图执行过程中产出的原始数据块（文本片段或中断事件 JSON 字符串），
              不包含 SSE 格式包装（如 `data:` 前缀），由上层路由包装为 SSE。
 
     Raises:
-        ValueError: 当 `from_checkpoint_id` 为 `None` 且清空记忆失败时（由内部服务抛出）。
-        Exception: LangGraph 执行过程中的其他异常。
+        ValueError: 当 `from_checkpoint_id` 为 `None` 且清空记忆操作失败时抛出。
+        Exception: LangGraph 执行过程中的其他异常（如状态不存在、图执行错误等）。
 
     Note:
-        - 本函数不操作 MySQL，MySQL 的删除和更新由 Java 端负责。
+        - 本函数不操作 MySQL，MySQL 的删除和更新由 Java 端在调用本接口前完成。
         - 如果 `from_checkpoint_id` 为 `None`，会先清空该 Agent 的 PostgreSQL checkpoints 和 Milvus 集合，
-          确保状态一致。
-        - 恢复或清空后，图从 `llm_node` 继续执行（`relevant_user_memories` 不会重新运行，
-          但 `SystemMessage` 中的知识库和记忆信息已在首次对话时注入）。
-        - 该生成器产生的数据与 `chat_with_agent_service` 格式一致，
-          可直接交由 `StreamingResponse` 包装。
+          确保状态一致性。
+        - 恢复或清空后，图从 `llm_node` 继续执行（`relevant_user_memories` 不会重新运行），
+          但 `SystemMessage` 中的知识库和记忆信息已在首次对话时注入，不会丢失。
+        - 该生成器产生的数据格式与 `chat_with_agent_service` 一致，
+          可直接交由 `StreamingResponse` 包装为 SSE 响应。
+        - 本函数不包含权限校验，权限校验由 Java 端和路由层负责。
     """
-    if update_message_dto.from_checkpoint_id == None:
-        await clear_session_message_service()
+    collection_name = f"aura_agent_{update_message_dto.message.agent_id}_session_memory"
+    if update_message_dto.message.from_checkpoint_id == None:
+        await clear_session_message_service(update_message_dto.message.agent_id)
+    else:
+        milvus_client.delete(
+            collection_name=collection_name,
+            filter=f"create_time>={update_message_dto.message.create_time}"
+        )
+
+    config = {
+        "user_id": "aura-user-" + str(update_message_dto.user_id),
+        "thread_id": "aura-thread-" + str(update_message_dto.message.agent_id),
+        "agent_id": update_message_dto.message.agent_id,
+        "knowledge_bases": update_message_dto.knowledge_bases,
+        "from_checkpoint_id": update_message_dto.message.from_checkpoint_id,
+        "enable_web_search": update_message_dto.enable_web_search,
+        "checkpoint_id": update_message_dto.message.from_checkpoint_id,
+    }
+
+    astream = aura_agent.astream_events(
+        input=HumanMessage(content=update_message_dto.human_content),
+        config=config,
+        version="v3",
+    )
+
+    async for event in astream:
+        if event["event"] == "on_chat_model_stream":
+            content = event["data"]["chunk"]["content"]
+
+            if content != "":
+                yield f"data: {content}\n\n"
+
+        if event["event"] == "interrupt":
+            value = event["data"]["value"]
+            value_json = json.dumps(value)
+
+            yield f"event: interrupt\ndata: {value_json}\n\n"
+
+
+

@@ -344,7 +344,7 @@ public class SysChatServiceImpl implements SysChatService {
         messageUpdateVODto.setHumanContent(chatDto.getHumanContent());
         messageUpdateVODto.setUserId(loginId);
         messageUpdateVODto.setEnableWebSearch(chatDto.getEnableWebSearch());
-        messageUpdateVODto.setFromCheckpointId(fromCheckpointId);
+        messageUpdateVODto.setMessage(message);
 
         //获取绑定的知识库信息
         List<Long> kbIds = agentKbBindingMapper.selectKbIdsByAgentId(agent.getId());
@@ -360,8 +360,8 @@ public class SysChatServiceImpl implements SysChatService {
 
         //封装sse协议，并发送请求给python端
         SseEmitter sseEmitter = new SseEmitter(120_000L);
-        webClient.post()
-                .uri(uriBuilder -> uriBuilder.path("/api/v1/chat/update/{message_id}").build(messageId))
+        webClient.put()
+                .uri("/api/v1/chat/update")
                 .bodyValue(messageUpdateVODto)
                 .retrieve()
                 .bodyToFlux(String.class)

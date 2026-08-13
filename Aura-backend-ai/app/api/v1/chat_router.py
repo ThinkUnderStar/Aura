@@ -3,7 +3,8 @@ from starlette.responses import StreamingResponse
 
 from app.models.request import ChatDto, ToolAllowDto, UpdateMessageDto
 from app.models.response import Result
-from app.services.v1.chat_service import chat_with_agent_service, tool_allow_service, clear_session_message_service
+from app.services.v1.chat_service import chat_with_agent_service, tool_allow_service, clear_session_message_service, \
+    update_message_service
 
 chat_router = APIRouter(prefix="/chat",tags=["agent"])
 
@@ -146,57 +147,71 @@ async def clear_session_message(
     """
     return await clear_session_message_service(agent_id)
 
-@chat_router.put("/update/{message_id}")
+@chat_router.put("/update")
 async def update_message(
-        message_id: int = Path(..., description="修改的message的ID"),
         update_message_dto: UpdateMessageDto = Body(..., description="修改该message要用的信息")
 ) -> StreamingResponse:
     """
     修改指定消息的内容，并从该消息处重新生成后续对话（SSE 流式响应）。
 
-    此接口用于用户编辑某条历史消息（例如修正错别字、调整问题描述），
-    系统会删除该消息之后的所有对话（包括 AI 回复、工具调用和确认消息），
-    用新内容替换原消息，然后从该消息处重新执行 LangGraph 图，流式返回新的 AI 响应。
+    **功能说明**：
+    此接口用于用户编辑某条历史消息（例如修正错别字、调整问题描述）。
+    用户将完整的消息对象（包含消息 ID、内容、`from_checkpoint_id` 等）以及新内容一起传回，
+    系统会从该消息对应的 checkpoint 恢复状态，用新内容替换原消息，然后重新执行 LangGraph 图，
+    流式返回新的 AI 响应。
 
     **执行流程**：
-    1. 根据 `message_id` 查询原消息，校验是否属于当前用户且属于指定 Agent。
-    2. 获取原消息对应的 `from_checkpoint_id`（如果原消息为 Human 消息，则直接取；否则向上查找）。
-    3. 删除该消息之后的所有消息（MySQL 物理删除）。
-    4. 用 `update_message_dto.human_content` 更新该消息的内容。
-    5. 使用 `from_checkpoint_id` 构建 `config`，调用 Python 端流式接口重新执行图。
+    1. 从 `update_message_dto.message` 中获取原消息信息（包括 `message_id`、`from_checkpoint_id`、`agent_id` 等）。
+    2. Java 端负责删除该消息之后的所有 MySQL 消息记录（不删除该消息本身）。
+    3. Java 端用 `update_message_dto.human_content` 更新该消息的内容。
+    4. Java 端构建请求体，调用本接口：
+       - 如果 `from_checkpoint_id` 不为 `None`，则从该 checkpoint 恢复图状态。
+       - 如果 `from_checkpoint_id` 为 `None`，则先清空该 Agent 的所有记忆（PostgreSQL checkpoints + Milvus 集合），然后以全新状态开始。
+    5. Python 端将新内容作为 `HumanMessage` 输入，调用 `astream_events` 生成流式事件。
     6. 将生成的 SSE 流透传给前端。
 
     **限流策略**：
     - 敏感操作，限流更严格：
       - 突发容量：`5`
       - 平均速率：`0.1` 次/秒（即每 10 秒最多 1 次）
-      - 防止用户频繁修改消息导致系统负担。
 
     Args:
-        message_id (int): 要修改的消息 ID（路径参数）。
-        update_message_dto (UpdateMessageDto): 包含新消息内容、联网搜索开关、知识库列表及 `from_checkpoint_id` 的请求体。
+        update_message_dto (UpdateMessageDto): 包含以下字段的请求体：
+            - `message` (MessageEntity): 原消息完整对象（包含 `id`、`agent_id`、`from_checkpoint_id`、`content` 等）。
+            - `human_content` (str): 修改后的新消息内容。
+            - `enable_web_search` (int): 是否开启联网搜索（1-开启，0-关闭）。
+            - `knowledge_bases` (List[KnowledgeBaseDto]): 知识库列表。
 
     Returns:
-        StreamingResponse: `text/event-stream` 格式的 SSE 流，前端通过 EventSource 监听。
-        事件类型：
-        - `data: <text>`：文本片段（逐字或逐块）
-        - `event: interrupt\n data: {...}`：中断确认（需要用户操作）
+        StreamingResponse: SSE 流（`text/event-stream`），事件类型：
+        - `data: <text>`：文本片段
+        - `event: interrupt\n data: {...}`：中断确认
         - `event: done`：对话结束
 
     Raises:
         HTTPException:
+            - 400: 请求体缺少必填字段（如 `message` 或 `human_content` 为空）
             - 404: 消息不存在或不属于该 Agent
             - 403: 用户无权修改该消息（需登录且为消息所属用户）
-            - 400: 请求体缺少 `from_checkpoint_id`（但已由 Pydantic 校验）
-            - 429: 请求频率超限（限流触发）
+            - 429: 请求频率超限
             - 500: Python 端执行失败或内部异常
 
     Note:
         - 该操作会**不可逆地删除**该消息之后的所有消息，请前端在调用前务必让用户二次确认。
-        - `from_checkpoint_id` 必须为有效的 checkpoint ID，否则恢复失败。
+        - `from_checkpoint_id` 为 `None` 时，会清空该 Agent 的所有记忆（包括 checkpoints 和 Milvus 集合），然后从头开始新对话。
         - 修改成功后，该消息之后的旧对话将无法恢复，新对话从该消息处重新开始。
         - 本接口需登录（SaToken 拦截），未登录返回 401。
-        - 修改后，`relevant_user_memories` 节点不会重新执行（因为图从 `llm_node` 恢复），
-          但 `SystemMessage` 中的知识库和记忆信息已在首次对话时注入，不会丢失。
+        - 修改后，`relevant_user_memories` 节点不会重新执行（因为图从 `llm_node` 恢复），但 `SystemMessage` 中的知识库和记忆信息已在首次对话时注入，不会丢失。
     """
-    pass
+    event_stream = update_message_service(update_message_dto)
+    return StreamingResponse(
+        event_stream,
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
+
+
+
