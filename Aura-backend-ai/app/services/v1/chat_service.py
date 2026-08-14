@@ -7,11 +7,9 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
 
 from app.db.milvus.client import milvus_client
-from app.db.postgresql.connect import checkpoint
+from app.db.postgresql.connect import checkpoint, aura_agent
 from app.models.request import ChatDto, ToolAllowDto, UpdateMessageDto
 from app.models.response import Result
-from app.services.agent.graph import graph, aura_agent
-
 
 async def chat_with_agent_service(agent_id: int,chat_dto: ChatDto) -> AsyncGenerator[str,None]:
     """
@@ -56,13 +54,15 @@ async def chat_with_agent_service(agent_id: int,chat_dto: ChatDto) -> AsyncGener
         checkpoint_id = None
 
     config = {
-        "user_id": "aura-user-"+str(chat_dto.user_id),
-        "thread_id": "aura-thread-"+str(agent_id),
-        "agent_id": agent_id,
-        "knowledge_bases": chat_dto.knowledge_bases,
-        "from_checkpoint_id": checkpoint_id,
-        "enable_web_search": chat_dto.enable_web_search,
-        "is_sensitive": chat_dto.is_sensitive
+        "configurable": {
+            "user_id": "aura-user-" + str(chat_dto.user_id),
+            "thread_id": "aura-thread-" + str(agent_id),
+            "agent_id": agent_id,
+            "knowledge_bases": chat_dto.knowledge_bases,
+            "from_checkpoint_id": checkpoint_id,
+            "enable_web_search": chat_dto.enable_web_search,
+            "is_sensitive": chat_dto.is_sensitive
+        }
     }
 
     # 创建异步生成器
@@ -133,10 +133,12 @@ async def tool_allow_service(
         - 该函数返回的是异步生成器，由 FastAPI 的 `StreamingResponse` 驱动消费。
     """
     config = {
-        "user_id": "aura-user-" + str(tool_allow_dto.user_id),
-        "thread_id": "aura-thread-" + str(tool_allow_dto.agent_id),
-        "agent_id": tool_allow_dto.agent_id,
-        "enable_web_search": tool_allow_dto.enable_web_search,
+        "configurable": {
+            "user_id": "aura-user-" + str(tool_allow_dto.user_id),
+            "thread_id": "aura-thread-" + str(tool_allow_dto.agent_id),
+            "agent_id": tool_allow_dto.agent_id,
+            "enable_web_search": tool_allow_dto.enable_web_search,
+        }
     }
 
     astream = aura_agent.astream_events(
@@ -260,20 +262,22 @@ async def update_message_service(
     if update_message_dto.message.from_checkpoint_id == None:
         await clear_session_message_service(update_message_dto.message.agent_id)
     else:
-        milvus_client.delete(
+        await milvus_client.delete(
             collection_name=collection_name,
-            filter=f"create_time>={update_message_dto.message.create_time}"
+            filter=f"create_time >= '{update_message_dto.message.create_time.isoformat()}'"
         )
 
     config = {
-        "user_id": "aura-user-" + str(update_message_dto.user_id),
-        "thread_id": "aura-thread-" + str(update_message_dto.message.agent_id),
-        "agent_id": update_message_dto.message.agent_id,
-        "knowledge_bases": update_message_dto.knowledge_bases,
-        "from_checkpoint_id": update_message_dto.message.from_checkpoint_id,
-        "enable_web_search": update_message_dto.enable_web_search,
-        "checkpoint_id": update_message_dto.message.from_checkpoint_id,
-        "is_sensitive": update_message_dto.is_sensitive
+        "configurable": {
+            "user_id": "aura-user-" + str(update_message_dto.user_id),
+            "thread_id": "aura-thread-" + str(update_message_dto.message.agent_id),
+            "agent_id": update_message_dto.message.agent_id,
+            "knowledge_bases": update_message_dto.knowledge_bases,
+            "from_checkpoint_id": update_message_dto.message.from_checkpoint_id,
+            "enable_web_search": update_message_dto.enable_web_search,
+            "checkpoint_id": update_message_dto.message.from_checkpoint_id,
+            "is_sensitive": update_message_dto.is_sensitive
+        }
     }
 
     astream = aura_agent.astream_events(

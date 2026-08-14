@@ -343,6 +343,7 @@ public class SysChatServiceImpl implements SysChatService {
         //删除MySQL中回溯语句之后的message
         messageMapper.delete(
                 new LambdaQueryWrapper<Message>()
+                        .eq(Message::getAgentId,agent.getId())
                         .ge(Message::getCreateTime,message.getCreateTime())
         );
 

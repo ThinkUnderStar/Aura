@@ -1,9 +1,20 @@
-from typing import List
+from datetime import datetime
+from typing import List, Optional
 
 from pydantic import BaseModel
 
-from app.db.mysql.entities import MessageEntity
+class MessageSchema(BaseModel):
+    """消息数据传输对象（Pydantic 模型）"""
 
+    id: int
+    agent_id: int
+    role: str
+    content: Optional[str] = None
+    from_checkpoint_id: Optional[str] = None
+    action: Optional[str] = None
+    edited_content: Optional[str] = None
+    version: int
+    create_time: datetime
 
 class PromptDto(BaseModel):
     prompt: str
@@ -28,6 +39,6 @@ class ToolAllowDto(BaseModel):
     enable_web_search: int
 
 class UpdateMessageDto(ChatDto):
-    message: MessageEntity
+    message: MessageSchema
 
 

@@ -164,7 +164,7 @@ public class SysUserServiceImpl implements SysUserService {
             }
         }
 
-        String avatar = "/avatars/"+loginId+"-"+System.currentTimeMillis()+"-aura"+ext;
+        String avatar = "/avatars/"+loginId+"-"+System.currentTimeMillis()+"-aura."+ext;
         try {
             file.transferTo(Path.of("./docs"+avatar).toFile());
         } catch (IOException e) {

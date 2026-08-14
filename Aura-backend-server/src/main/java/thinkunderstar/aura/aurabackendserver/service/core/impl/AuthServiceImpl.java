@@ -321,6 +321,10 @@ public class AuthServiceImpl implements AuthService {
 
         //是否被封禁
         if (user.getStatus() == 0) {
+            if (userVODto.getBanEndTime() == null) {
+                return Result.error(403,"账号已被永久封禁", userVODto);
+            }
+
             if (LocalDateTime.now().isAfter(userVODto.getBanEndTime())) {
                 unBanUser(user);
                 //登录

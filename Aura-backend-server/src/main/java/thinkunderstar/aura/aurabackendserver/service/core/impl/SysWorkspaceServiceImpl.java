@@ -169,7 +169,7 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
         workspaceOperationLogService.save(workspaceOperationLog);
 
         WorkspaceVODto workspaceVODto = new WorkspaceVODto(
-                loginId,
+                workspace.getId(),
                 0,
                 workspace.getName(),
                 workspace.getDescription(),
@@ -273,7 +273,7 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
             }
         }
 
-        String logo = "/workspace_logos/"+workspaceId+"-"+System.currentTimeMillis()+"-aura"+ext;
+        String logo = "/workspace_logos/"+workspaceId+"-"+System.currentTimeMillis()+"-aura."+ext;
         try {
             file.transferTo(Path.of("./docs"+logo).toFile());
         } catch (IOException e) {

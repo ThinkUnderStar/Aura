@@ -2,7 +2,7 @@ package thinkunderstar.aura.aurabackendserver.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Select;
-import org.springframework.data.repository.query.Param;
+import org.apache.ibatis.annotations.Param;
 import thinkunderstar.aura.aurabackendserver.entity.KnowledgeBase;
 
 import java.util.List;
