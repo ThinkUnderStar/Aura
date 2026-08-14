@@ -1,5 +1,6 @@
 package thinkunderstar.aura.aurabackendserver.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 @Data
@@ -17,5 +18,7 @@ public class LoginDto {
      * 验证码
      */
     private String code;
+
+    @JsonProperty("isRemember")
     private boolean isRemember;
 }

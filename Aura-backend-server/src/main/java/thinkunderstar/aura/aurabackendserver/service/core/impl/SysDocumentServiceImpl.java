@@ -119,9 +119,7 @@ public class SysDocumentServiceImpl implements SysDocumentService {
                             .eq(WorkspaceMember::getWorkspaceId, workspace.getId())
                             .eq(WorkspaceMember::getUserId, loginId)
                             .eq(WorkspaceMember::getStatus,1)
-                            .eq(WorkspaceMember::getRole, 0)
-                            .or()
-                            .eq(WorkspaceMember::getRole, 1)
+                            .in(WorkspaceMember::getRole, List.of(0, 1))
             );
 
             if (member == null) {
@@ -287,9 +285,7 @@ public class SysDocumentServiceImpl implements SysDocumentService {
                             .eq(WorkspaceMember::getWorkspaceId, workspace.getId())
                             .eq(WorkspaceMember::getUserId, loginId)
                             .eq(WorkspaceMember::getStatus,1)
-                            .eq(WorkspaceMember::getRole, 0)
-                            .or()
-                            .eq(WorkspaceMember::getRole, 1)
+                            .in(WorkspaceMember::getRole,List.of(0,1))
             );
 
             if (member == null) {

@@ -1,25 +1,24 @@
 import logging
 from typing import List
-
 from langchain_core.messages import ToolMessage, SystemMessage, AIMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.config import get_store
 from langgraph.types import Command, interrupt
 from langmem.short_term import SummarizationNode
 from pymilvus import DataType, FieldSchema, CollectionSchema
-
 from app.core.config import settings
-from app.core.llm import chat_llm, extractor_llm
+from app.core.llm import extractor_llm
 from app.db.milvus.client import milvus_client
 from app.db.mysql.entities import MessageEntity
 from app.db.mysql.session import AsyncSessionLocal
-from app.services.agent.graph import State
+from app.models.state import State
 from app.services.agent.llm import chat_llm_with_tools
 from app.services.agent.prompts import SYSTEM_PROMPT_TEMPLATE
 from app.services.agent.tools import search_knowledge_base, save_user_memory, get_user_memory, search_user_memory, \
     delete_user_memory, search_full_session_memory, web_search
 from app.services.rag.embedding import embed_memory
 from app.services.rag.vector_store import vector_store
+from app.tools.count_tokens import count_tokens_for_messages
 
 
 async def llm_node(state:State) -> State:
@@ -74,7 +73,7 @@ async def run_tool(state:State,config:RunnableConfig) -> State:
     for tool_call in tool_calls:
         #增强检索指定知识库
         if tool_call["name"] == "search_knowledge_base":
-            result = await search_knowledge_base.ainvoke(tool_call["args"])
+            result = await search_knowledge_base.ainvoke(tool_call["args"],config=config)
 
         #添加用户级记忆（需用户自己确认）
         elif tool_call["name"] == "save_user_memory":
@@ -86,24 +85,24 @@ async def run_tool(state:State,config:RunnableConfig) -> State:
 
             if user_choice["choice"] == "approve":
 
-                result = await save_user_memory.ainvoke(tool_call["args"])
+                result = await save_user_memory.ainvoke(tool_call["args"],config=config)
             elif user_choice["choice"] == "reject":
 
                 result = "用户拒绝将该内容添加进用户级记忆"
             elif user_choice["choice"] == "edit":
 
-                result = await save_user_memory.ainvoke(user_choice["edit"])
+                result = await save_user_memory.ainvoke({"thing": user_choice["edit"]},config=config)
             else:
 
                 result = "用户的选择异常，不符合规范"
 
         #获取用户的所有用户级记忆
         elif tool_call["name"] == "get_user_memory":
-            result = await get_user_memory.ainvoke(tool_call["args"])
+            result = await get_user_memory.ainvoke(tool_call["args"],config=config)
 
         #搜索该用户的相关用户级记忆
         elif tool_call["name"] == "search_user_memory":
-            result = await search_user_memory.ainvoke(tool_call["args"])
+            result = await search_user_memory.ainvoke(tool_call["args"],config=config)
 
         #删除用户指定的用户级记忆
         elif tool_call["name"] == "delete_user_memory":
@@ -137,18 +136,18 @@ async def run_tool(state:State,config:RunnableConfig) -> State:
                         result = "用户拒绝删除这些用户级记忆"
 
                     elif user_choice["choice"] == "approve":
-                        result = await delete_user_memory.ainvoke(tool_call["args"])
+                        result = await delete_user_memory.ainvoke(tool_call["args"],config=config)
 
                     else:
                         result = "用户的选择异常，不符合规范"
 
         #搜索该分支的完整会话记忆
         elif tool_call["name"] == "search_full_session_memory":
-            result = await search_full_session_memory.ainvoke(tool_call["args"])
+            result = await search_full_session_memory.ainvoke(tool_call["args"],config=config)
 
         #联网搜索
         elif tool_call["name"] == "web_search":
-            result = await  web_search.ainvoke(tool_call["args"])
+            result = await  web_search.ainvoke(tool_call["args"],config=config)
 
         #过滤对不存在工具的调用
         else:
@@ -249,7 +248,7 @@ async def relevant_user_memories(state:State,config:RunnableConfig) -> State:
 
 #创建压缩对话节点（减少Token消耗）
 summarization_node  = SummarizationNode(
-    token_counter=chat_llm.get_num_tokens_from_messages,
+    token_counter=count_tokens_for_messages,
     model=extractor_llm,
     max_tokens_before_summary=4096,
     max_summary_tokens=512

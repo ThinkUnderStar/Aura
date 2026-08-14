@@ -1,6 +1,6 @@
-from tkinter.tix import Select
 from typing import List
 
+from sqlalchemy import Select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.milvus.client import milvus_client

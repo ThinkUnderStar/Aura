@@ -531,24 +531,35 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
     public void cleanExpiredKnowledgeBases() {
         LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
 
-        List<Long> expiredKnowledgeBaseIds = knowledgeBaseMapper.selectList(
+        List<KnowledgeBase> expiredKnowledgeBases = knowledgeBaseMapper.selectList(
                         new LambdaQueryWrapper<KnowledgeBase>()
                                 .eq(KnowledgeBase::getIsTeam, 0)
                                 .eq(KnowledgeBase::getStatus, 0)
                                 .le(KnowledgeBase::getUpdateTime, thirtyDaysAgo)
-                ).stream()
-                .map(KnowledgeBase::getId)
-                .collect(Collectors.toList());
+                );
 
-        for (Long expiredKnowledgeBaseId : expiredKnowledgeBaseIds) {
+        for (KnowledgeBase expiredKnowledgeBase : expiredKnowledgeBases) {
+
+            transactionTemplate.execute(status -> {
+                knowledgeBaseService.removeById(expiredKnowledgeBase.getId());
+                return null;
+            });
+
             try {
-                transactionTemplate.execute(status -> {
-                    knowledgeBaseService.removeById(expiredKnowledgeBaseId);
-                    log.warn("python端删除milvus数据库的接口未完成");
-                    return null;
-                });
+                Result result = webClient.delete()
+                        .uri(
+                                uriBuilder -> uriBuilder.path("/api/v1/kb/delete/{kb_name}")
+                                        .build(expiredKnowledgeBase.getCollectionName())
+                        )
+                        .retrieve()
+                        .bodyToMono(Result.class)
+                        .block();
+
+                if (result == null || result.getCode() != 200) {
+                    throw new BusinessException("删除对应milvus向量数据库异常");
+                }
             } catch (Exception e){
-                log.error("清理失败: {}", expiredKnowledgeBaseId, e);  // 只打日志
+                log.error("清理失败: {}", expiredKnowledgeBase.getId(), e);  // 只打日志
             }
         }
     }

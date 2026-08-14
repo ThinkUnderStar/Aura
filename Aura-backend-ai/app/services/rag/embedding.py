@@ -81,7 +81,7 @@ async def embed_memory(content: str,message: MessageEntity) -> List[dict]:
                 "vector": e,
                 "message_id": message.id,
                 "message_role": message.role,
-                "create_time": message.create_time
+                "create_time": message.create_time.isoformat()
             }
         )
 
