@@ -22,6 +22,7 @@ import thinkunderstar.aura.aurabackendserver.service.wrapper.AgentService;
 import thinkunderstar.aura.aurabackendserver.service.wrapper.MessageService;
 import thinkunderstar.aura.aurabackendserver.util.RedisTokenBucketLimiter;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -132,13 +133,17 @@ public class SysChatServiceImpl implements SysChatService {
 
         //获取绑定的知识库信息
         List<Long> kbIds = agentKbBindingMapper.selectKbIdsByAgentId(agentId);
-        List<KnowledgeBaseVODto> knowledgeBases = knowledgeBaseMapper.selectByIds(kbIds)
-                .stream()
-                .map(knowledgeBase -> new KnowledgeBaseVODto(
-                        knowledgeBase.getCollectionName(),
-                        knowledgeBase.getDescription()
-                ))
-                .collect(Collectors.toList());
+        List<KnowledgeBaseVODto> knowledgeBases = new ArrayList<>();
+
+        if (kbIds != null && !kbIds.isEmpty()) {
+            knowledgeBases = knowledgeBaseMapper.selectByIds(kbIds)
+                    .stream()
+                    .map(knowledgeBase -> new KnowledgeBaseVODto(
+                            knowledgeBase.getCollectionName(),
+                            knowledgeBase.getDescription()
+                    ))
+                    .collect(Collectors.toList());
+        }
 
         chatVODto.setKnowledgeBases(knowledgeBases);
 

@@ -7,7 +7,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
 
 from app.db.milvus.client import milvus_client
-from app.db.postgresql.connect import checkpoint, aura_agent
+from app.db.postgresql import connect as pg_connect
 from app.models.request import ChatDto, ToolAllowDto, UpdateMessageDto
 from app.models.response import Result
 
@@ -43,7 +43,7 @@ async def chat_with_agent_service(agent_id: int,chat_dto: ChatDto) -> AsyncGener
             - `error`: 错误信息，展示提示。
         - 中断确认后，前端需调用 `/resume` 接口继续对话。
     """
-    snapshot = await checkpoint.aget(RunnableConfig(
+    snapshot = await pg_connect.checkpoint.aget_tuple(RunnableConfig(
         configurable={"thread_id": "aura-thread-"+str(agent_id)}
     ))
 
@@ -66,10 +66,10 @@ async def chat_with_agent_service(agent_id: int,chat_dto: ChatDto) -> AsyncGener
     }
 
     # 创建异步生成器
-    astream = aura_agent.astream_events(
-        input=HumanMessage(content=chat_dto.human_content),
+    astream = pg_connect.aura_agent.astream_events(
+        input={"messages": [HumanMessage(content=chat_dto.human_content)]},
         config=config,
-        version="v3",
+        version="v2",
     )
  
     async for event in astream:
@@ -141,7 +141,7 @@ async def tool_allow_service(
         }
     }
 
-    astream = aura_agent.astream_events(
+    astream = pg_connect.aura_agent.astream_events(
         Command(
             resume = {
                 "choice": tool_allow_dto.choice,
@@ -149,7 +149,7 @@ async def tool_allow_service(
             },
         ),
         config=config,
-        version="v3",
+        version="v2",
     )
 
     async for event in astream:
@@ -202,7 +202,7 @@ async def clear_session_message_service(
         - **依赖服务**：该接口依赖 PostgreSQL checkpointer 和 Milvus 服务，请确保相关服务正常运行。
     """
     try:
-        await checkpoint.adelete_thread("aura-thread-" + str(agent_id))
+        await pg_connect.checkpoint.adelete_thread("aura-thread-" + str(agent_id))
         if await milvus_client.has_collection(f"aura_agent_{agent_id}_session_memory"):
             await milvus_client.drop_collection(f"aura_agent_{agent_id}_session_memory")
         return Result.success(msg="会话记录清除成功")
@@ -280,10 +280,10 @@ async def update_message_service(
         }
     }
 
-    astream = aura_agent.astream_events(
-        input=HumanMessage(content=update_message_dto.human_content),
+    astream = pg_connect.aura_agent.astream_events(
+        input={"messages": HumanMessage(content=update_message_dto.human_content)},
         config=config,
-        version="v3",
+        version="v2",
     )
 
     async for event in astream:

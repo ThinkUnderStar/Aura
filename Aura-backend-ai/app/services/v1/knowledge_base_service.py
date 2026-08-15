@@ -1,4 +1,5 @@
 from pymilvus import FieldSchema, DataType, CollectionSchema
+from pymilvus.milvus_client import IndexParams
 
 from app.core.config import settings
 from app.db.milvus.client import milvus_client
@@ -31,15 +32,16 @@ async def create_knowledge_base_service(kb_name: str) -> Result[None]:
         )
 
         # 创建索引
-        index_params = {
-            "metric_type": "COSINE",
-            "index_type": "IVF_FLAT",  # 数据量小可改为 "FLAT"
-            "params": {"nlist": 128}
-        }
+        index_params = IndexParams()
+        index_params.add_index(
+            field_name="vector",
+            index_type="IVF_FLAT",
+            metric_type="COSINE",
+            params={"nlist": 128},
+        )
 
         await milvus_client.create_index(
             collection_name=kb_name,
-            field_name="vector",
             index_params=index_params
         )
 

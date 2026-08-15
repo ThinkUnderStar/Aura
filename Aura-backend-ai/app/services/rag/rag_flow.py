@@ -3,7 +3,7 @@ from langchain_classic.retrievers import MultiQueryRetriever, ContextualCompress
 from langchain_classic.retrievers.document_compressors import CrossEncoderReranker, LLMChainExtractor, \
     DocumentCompressorPipeline
 from langchain_community.document_compressors import LLMLinguaCompressor
-from langchain_community.vectorstores import Milvus
+from langchain_community.vectorstores.milvus import Milvus
 from langchain_core.documents import Document
 
 from app.core.config import settings

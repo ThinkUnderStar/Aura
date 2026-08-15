@@ -12,13 +12,13 @@ import java.time.Duration;
 @Configuration
 public class WebClientConfig {
     @Bean
-    public WebClient webClient() {
+    public WebClient webClient(WebClient.Builder builder) {
         HttpClient httpClient = HttpClient.create()
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5000)
                 .responseTimeout(Duration.ofMinutes(5));
 
         //该Bean类专门访问python端的服务
-        return WebClient.builder()
+        return builder
                 .baseUrl("http://localhost:8002")
                 .defaultHeader("Content-Type", "application/json")
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
