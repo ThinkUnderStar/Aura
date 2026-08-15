@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============ 基础重置与全局基调 ============ */
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  @apply bg-canvas text-ink font-sans antialiased;
+  font-feature-settings: 'tnum' on, 'lnum' on;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* 细滚动条（克制） */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #d9d8d4 transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #d9d8d4;
+  border-radius: 9999px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@layer components {
+  /* 结构边框：全站统一的 1px 视觉纪律 */
+  .card {
+    @apply rounded-lg border border-line bg-surface;
+  }
+
+  /* 主按钮：墨黑实底、白字、无阴影、小圆角 */
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-sm px-3.5 py-2 text-sm font-medium
+      transition-colors duration-150 select-none disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-ink text-white hover:bg-neutral-800 active:bg-black;
+  }
+  .btn-secondary {
+    @apply btn border border-line bg-surface text-ink hover:bg-surface-muted;
+  }
+  .btn-ghost {
+    @apply btn text-muted hover:bg-surface-muted hover:text-ink;
+  }
+  .btn-danger {
+    @apply btn bg-red-text text-white hover:opacity-90;
+  }
+  .btn-danger-soft {
+    @apply btn border border-line bg-surface text-red-text hover:bg-red-bg;
+  }
+
+  .input {
+    @apply w-full rounded-sm border border-line bg-surface px-3 py-2 text-sm text-ink outline-none
+      transition-colors placeholder:text-faint focus:border-line-strong focus:ring-2 focus:ring-black/5;
+  }
+
+  .label {
+    @apply mb-1.5 block text-xs font-medium text-muted;
+  }
+}

@@ -6,6 +6,8 @@ from langgraph.config import get_store
 from langgraph.types import Command, interrupt
 from langmem.short_term import SummarizationNode
 from pymilvus import DataType, FieldSchema, CollectionSchema
+from pymilvus.milvus_client import IndexParams
+
 from app.core.config import settings
 from app.core.llm import extractor_llm
 from app.db.milvus.client import milvus_client
@@ -234,14 +236,14 @@ async def relevant_user_memories(state:State,config:RunnableConfig) -> State:
     old_system = state.messages[0]
     if isinstance(old_system,SystemMessage):
         new_system = SystemMessage(
-            content=system_prompt,
+            content=system_prompt.to_string(),
             id=old_system.id  # 保留相同 id，触发覆盖
         )
 
         return {"messages": [new_system]}
     else:
         new_system = SystemMessage(
-            content=system_prompt
+            content=system_prompt.to_string()
         )
 
         return {"messages": [new_system] + state.messages}
@@ -251,7 +253,7 @@ summarization_node  = SummarizationNode(
     token_counter=count_tokens_for_messages,
     model=extractor_llm,
     max_tokens_before_summary=4096,
-    max_summary_tokens=512
+    max_tokens=512
 )
 
 async def save_human_session_memory(state: State,config: RunnableConfig) -> State:
@@ -318,14 +320,15 @@ async def save_human_session_memory(state: State,config: RunnableConfig) -> Stat
         await milvus_client.create_collection(memory_collection_name, schema=schema)
 
         # 创建索引（必须）
-        index_params = {
-            "metric_type": "COSINE",
-            "index_type": "IVF_FLAT",
-            "params": {"nlist": 128}
-        }
+        index_params = IndexParams()
+        index_params.add_index(
+            field_name="vector",
+            index_type="IVF_FLAT",
+            metric_type="COSINE",
+            params={"nlist": 128},
+        )
         await milvus_client.create_index(
             collection_name=memory_collection_name,
-            field_name="vector",
             index_params=index_params
         )
 

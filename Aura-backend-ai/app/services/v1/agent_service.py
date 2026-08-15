@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.milvus.client import milvus_client
 from app.db.mysql.entities import AgentEntity
-from app.db.postgresql.connect import checkpoint, store
+from app.db.postgresql import connect as pg_connect
 from app.models.response import Result
 
 
@@ -54,13 +54,13 @@ async def delete_user_agents_all_memory(
             return Result.success(msg="该用户没有关联任何 Agent，无需清理")
 
         for agent in agents:
-            await checkpoint.adelete_thread("aura-thread-"+str(agent.id))
+            await pg_connect.checkpoint.adelete_thread("aura-thread-"+str(agent.id))
             await milvus_client.drop_collection(f"aura_agent_{agent.id}_session_memory")
 
         user_memory_space = ("users_memory", "aura-user-"+str(user_id))
-        user_memories = await store.asearch(user_memory_space,limit=1000)
+        user_memories = await pg_connect.store.asearch(user_memory_space,limit=1000)
         for user_memory in user_memories:
-            await store.adelete(user_memory_space,key=user_memory.key)
+            await pg_connect.store.adelete(user_memory_space,key=user_memory.key)
 
         return Result.success(msg="清除该用户的所有agent记忆成功")
 
