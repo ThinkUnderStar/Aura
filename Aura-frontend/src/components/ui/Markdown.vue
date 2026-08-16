@@ -7,8 +7,20 @@ const props = defineProps<{ content: string }>()
 
 marked.setOptions({ breaks: true, gfm: true })
 
+// 让 AI 返回的链接在新标签页打开，并附带安全 rel（防 tabnabbing）
+DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+  if (node.tagName === 'A') {
+    node.setAttribute('target', '_blank')
+    node.setAttribute('rel', 'noopener noreferrer')
+  }
+})
+
 const html = computed(() => {
-  const raw = marked.parse(props.content || '', { async: false }) as string
+  // 「~」在中文里常作区间分隔符（如 21℃~32℃、24~31℃），
+  // 但 marked 会把它当成删除线标记，导致两个 ~ 之间的大段文字被画横线。
+  // 这里把单独出现的 ~ 转义为字面量，仅保留成对的 ~~（真正的删除线）。
+  const text = (props.content || '').replace(/~+/g, (m) => (m.length >= 2 ? m : '\\~'))
+  const raw = marked.parse(text, { async: false }) as string
   return DOMPurify.sanitize(raw)
 })
 </script>
@@ -29,7 +41,10 @@ const html = computed(() => {
 }
 .markdown-body h1,
 .markdown-body h2,
-.markdown-body h3 {
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
   font-weight: 600;
   margin: 0.8em 0 0.4em;
   line-height: 1.4;
@@ -42,6 +57,16 @@ const html = computed(() => {
 }
 .markdown-body h3 {
   font-size: 1.05em;
+}
+.markdown-body h4 {
+  font-size: 1em;
+}
+.markdown-body h5 {
+  font-size: 0.95em;
+}
+.markdown-body h6 {
+  font-size: 0.9em;
+  color: #787774;
 }
 .markdown-body ul,
 .markdown-body ol {
@@ -82,6 +107,19 @@ const html = computed(() => {
   padding-left: 0.8em;
   color: #787774;
   margin: 0.5em 0;
+}
+.markdown-body hr {
+  border: none;
+  border-top: 1px solid #e0dfda;
+  margin: 1em 0;
+}
+.markdown-body img {
+  max-width: 100%;
+  border-radius: 6px;
+}
+.markdown-body input[type='checkbox'] {
+  margin-right: 0.4em;
+  accent-color: #1a1a18;
 }
 .markdown-body a {
   color: #1f6c9f;

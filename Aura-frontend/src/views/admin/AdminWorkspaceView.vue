@@ -19,6 +19,7 @@ const size = 20
 const loading = ref(false)
 const target = ref<Workspace | null>(null)
 const busy = ref(false)
+const keyword = ref('')
 
 const STATUS: Record<number, { tone: 'green' | 'red' | 'gray'; label: string }> = {
   [WS_STATUS.NORMAL]: { tone: 'green', label: '正常' },
@@ -29,7 +30,10 @@ const STATUS: Record<number, { tone: 'green' | 'red' | 'gray'; label: string }> 
 async function load() {
   loading.value = true
   try {
-    const { data } = await adminApi.workspaces(page.value, size)
+    const kw = keyword.value.trim()
+    const { data } = kw
+      ? await adminApi.searchWorkspaces(kw, page.value, size)
+      : await adminApi.workspaces(page.value, size)
     items.value = data.code === 200 ? data.data.records : []
     total.value = data.code === 200 ? data.data.total : 0
   } catch {
@@ -38,6 +42,17 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+function search() {
+  page.value = 1
+  load()
+}
+
+function clearSearch() {
+  keyword.value = ''
+  page.value = 1
+  load()
 }
 
 async function confirmAction() {
@@ -72,6 +87,15 @@ onMounted(load)
   <div class="mx-auto max-w-4xl px-4 py-8 md:px-8">
     <h1 class="text-lg font-medium text-ink">团队管理</h1>
     <p class="mt-1 text-sm text-faint">查看全部团队并执行封禁 / 解封。</p>
+
+    <div class="mt-5 flex items-center gap-2">
+      <div class="relative max-w-sm flex-1">
+        <AppIcon name="search" :size="15" class="absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
+        <input v-model="keyword" class="input pl-9" placeholder="按团队名称搜索" @keydown.enter="search" />
+      </div>
+      <button class="btn-secondary" @click="search">搜索</button>
+      <button v-if="keyword" class="btn-secondary" @click="clearSearch">清空</button>
+    </div>
 
     <div class="card mt-6 overflow-hidden">
       <div v-if="loading" class="flex justify-center py-16">

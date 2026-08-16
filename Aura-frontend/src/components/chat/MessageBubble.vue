@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { MessageVO } from '@/types'
 import { useAuthStore } from '@/stores/auth'
 import { toast } from '@/stores/toast'
@@ -8,11 +8,61 @@ import Markdown from '@/components/ui/Markdown.vue'
 import AppAvatar from '@/components/ui/AppAvatar.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
 
-const props = defineProps<{ message: MessageVO }>()
+const props = defineProps<{ message: MessageVO; disabled?: boolean }>()
+const emit = defineEmits<{
+  (e: 'edit-submit', message: MessageVO, newContent: string): void
+}>()
 const auth = useAuthStore()
 
 const isUser = computed(() => props.message.role === 'user')
 const isTool = computed(() => props.message.role === 'tool_confirm')
+
+// 解析工具调用确认的 JSON 载荷，用于结构化展示而非渲染原始 JSON 字符串
+const toolPayload = computed(() => {
+  if (!isTool.value) return null
+  try {
+    const obj = JSON.parse(props.message.content)
+    if (obj && typeof obj.question === 'string') return obj as { question: string; options?: string[] }
+  } catch {
+    /* 解析失败按纯文本兜底 */
+  }
+  return null
+})
+
+const toolQuestion = computed(() => toolPayload.value?.question || props.message.content)
+
+const ACTION_LABEL: Record<string, string> = {
+  approve: '已确认执行',
+  reject: '已拒绝',
+  edit: '已修改为',
+  continue: '已继续',
+  cancel: '已取消',
+}
+const actionLabel = computed(() => {
+  const a = props.message.action
+  return a ? ACTION_LABEL[a] || a : ''
+})
+
+// 编辑（回溯）：仅用户消息可编辑，重新生成后续对话
+const editing = ref(false)
+const draft = ref('')
+
+function startEdit() {
+  draft.value = props.message.content
+  editing.value = true
+}
+
+function cancelEdit() {
+  editing.value = false
+  draft.value = ''
+}
+
+function submitEdit() {
+  const text = draft.value.trim()
+  if (!text) return
+  editing.value = false
+  emit('edit-submit', props.message, text)
+}
 
 function copy() {
   navigator.clipboard?.writeText(props.message.content).then(
@@ -24,12 +74,47 @@ function copy() {
 
 <template>
   <!-- 用户消息：右对齐，墨黑气泡 -->
-  <div v-if="isUser" class="flex justify-end gap-3">
+  <div v-if="isUser" class="group flex justify-end gap-3">
     <div class="flex max-w-[80%] flex-col items-end">
-      <div class="rounded-lg rounded-tr-sm bg-ink px-4 py-2.5 text-sm leading-6 text-white">
+      <!-- 编辑态 -->
+      <div v-if="editing" class="rounded-lg rounded-tr-sm bg-ink px-3 py-2.5">
+        <textarea
+          v-model="draft"
+          rows="3"
+          class="block w-80 max-w-full resize-y rounded-sm border border-white/20 bg-transparent px-2 py-1 text-sm leading-6 text-white placeholder-white/40 focus:border-white/60 focus:outline-none"
+          placeholder="请输入内容"
+        ></textarea>
+        <div class="mt-2 flex justify-end gap-2">
+          <button
+            class="rounded-sm px-2.5 py-1 text-xs text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+            @click="cancelEdit"
+          >
+            取消
+          </button>
+          <button
+            class="rounded-sm bg-white px-2.5 py-1 text-xs font-medium text-ink transition-colors hover:bg-white/90 disabled:opacity-50"
+            :disabled="!draft.trim()"
+            @click="submitEdit"
+          >
+            保存并重新生成
+          </button>
+        </div>
+      </div>
+      <!-- 普通态 -->
+      <div v-else class="rounded-lg rounded-tr-sm bg-ink px-4 py-2.5 text-sm leading-6 text-white">
         <span class="whitespace-pre-wrap break-words">{{ message.content }}</span>
       </div>
-      <span class="mt-1 text-xs text-faint">{{ formatTime(message.createTime, false) }}</span>
+      <div class="mt-1 flex items-center gap-2 text-xs text-faint">
+        <button
+          v-if="message.id > 0 && !disabled"
+          class="flex items-center gap-1 opacity-0 transition-opacity hover:text-ink group-hover:opacity-100"
+          @click="startEdit"
+        >
+          <AppIcon name="edit" :size="12" />
+          编辑
+        </button>
+        <span>{{ formatTime(message.createTime, false) }}</span>
+      </div>
     </div>
     <AppAvatar :src="auth.user?.avatar" :name="auth.user?.username" :size="32" />
   </div>
@@ -41,10 +126,18 @@ function copy() {
     </div>
     <div class="min-w-0 max-w-[80%]">
       <p class="text-xs text-faint">工具调用</p>
-      <div
-        class="mt-1 whitespace-pre-wrap break-words rounded-lg border border-line bg-surface px-4 py-2.5 font-mono text-xs leading-5 text-muted"
-      >
-        {{ message.content }}
+      <div class="mt-1 rounded-lg border border-line bg-surface px-4 py-2.5">
+        <p class="whitespace-pre-wrap break-words text-sm leading-6 text-ink">{{ toolQuestion }}</p>
+        <div
+          v-if="message.action"
+          class="mt-2 flex items-center gap-1.5 border-t border-line pt-2 text-xs text-muted"
+        >
+          <AppIcon :name="message.action === 'reject' ? 'x' : 'check'" :size="13" />
+          <span>{{ actionLabel }}</span>
+          <span v-if="message.action === 'edit' && message.editedContent" class="break-words text-ink">
+            {{ message.editedContent }}
+          </span>
+        </div>
       </div>
     </div>
   </div>

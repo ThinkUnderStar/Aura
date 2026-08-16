@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 from sqlalchemy import select
@@ -37,6 +38,7 @@ async def upload_document_service(kb_id: int,doc_id: int ,db: AsyncSession) -> R
         return Result.success(msg="文档上传知识库成功")
 
     except Exception as e:
+        logging.exception(f"文档上传知识库失败 kb_id={kb_id} doc_id={doc_id}: {e}")
         return Result.error(msg=f"上传知识库失败: {str(e)}", code=500)
 
 async def delete_document_service(kb_id: int,doc_id: int,db: AsyncSession) -> Result[None]:

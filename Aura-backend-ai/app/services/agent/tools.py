@@ -51,6 +51,7 @@ async def search_knowledge_base(question: str, kbs_name: List[str]) -> str:
         return result_str
 
     except Exception as e:
+        logging.exception(f"知识库查询异常 question={question!r} kbs_name={kbs_name!r}")
         return "知识库查询异常"
 
 @tool(name_or_callable="save_user_memory")

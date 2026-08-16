@@ -149,14 +149,16 @@ export interface Report {
 export interface OperationLog {
   id: number
   workspaceId: number
-  operatorId: number
+  userId: number
+  username: string
   module: string
-  action: string
-  summary: string
+  operation: string
+  requestSummary: string
+  status: number
   createTime: string
 }
 
 export interface BindingKbInfo {
-  personalKbIds?: number[]
-  teamWorkspaceIds?: number[]
+  kbIds?: number[]
+  workspaceIds?: number[]
 }

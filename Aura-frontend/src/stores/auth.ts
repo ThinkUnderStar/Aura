@@ -59,5 +59,11 @@ export const useAuthStore = defineStore('auth', () => {
     clearToken()
   }
 
-  return { user, token, isLoggedIn, isAdmin, login, logout, reset }
+  function updateUser(patch: Partial<UserVO>) {
+    if (!user.value) return
+    user.value = { ...user.value, ...patch }
+    localStorage.setItem(USER_KEY, JSON.stringify(user.value))
+  }
+
+  return { user, token, isLoggedIn, isAdmin, login, logout, reset, updateUser }
 })

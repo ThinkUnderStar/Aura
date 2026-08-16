@@ -157,22 +157,24 @@ public class SysChatServiceImpl implements SysChatService {
                 .bodyValue(chatVODto)
                 .retrieve()
                 .bodyToFlux(String.class)
-                .filter(response -> !response.trim().isEmpty())
+                .filter(s -> s != null && !s.trim().isEmpty())
                 .subscribe(
-                        response -> {
+                        data -> {
                             try {
-                                if (response.startsWith("data:")){
-                                    sseEmitter.send(response);
-                                } else if (response.startsWith("event: interrupt")) {
-
-                                    String interrupt_value_json = response.split("data:")[1].trim();
+                                String value = data.trim();
+                                if (value.startsWith("[INTERRUPT]")){
+                                    String interrupt_value_json = value.substring("[INTERRUPT]".length());
                                     Message tool_message = new Message();
                                     tool_message.setAgentId(agentId);
                                     tool_message.setRole("tool_confirm");
                                     tool_message.setContent(interrupt_value_json);
                                     messageService.save(tool_message);
 
-                                    sseEmitter.send(response);
+                                    sseEmitter.send(
+                                            SseEmitter.event().name("interrupt").data(interrupt_value_json)
+                                    );
+                                } else {
+                                    sseEmitter.send(value);
                                 }
                             }catch (Exception e){
                                 sseEmitter.completeWithError(e);
@@ -247,22 +249,24 @@ public class SysChatServiceImpl implements SysChatService {
                 .bodyValue(toolAllowVODto)
                 .retrieve()
                 .bodyToFlux(String.class)
-                .filter(response -> !response.trim().isEmpty())
+                .filter(s -> s != null && !s.trim().isEmpty())
                 .subscribe(
-                        response -> {
+                        data -> {
                             try {
-                                if (response.startsWith("data:")){
-                                    sseEmitter.send(response);
-                                } else if (response.startsWith("event: interrupt")) {
-
-                                    String interrupt_value_json = response.split("data:")[1].trim();
+                                String value = data.trim();
+                                if (value.startsWith("[INTERRUPT]")){
+                                    String interrupt_value_json = value.substring("[INTERRUPT]".length());
                                     Message tool_message = new Message();
                                     tool_message.setAgentId(agentId);
                                     tool_message.setRole("tool_confirm");
                                     tool_message.setContent(interrupt_value_json);
                                     messageService.save(tool_message);
 
-                                    sseEmitter.send(response);
+                                    sseEmitter.send(
+                                            SseEmitter.event().name("interrupt").data(interrupt_value_json)
+                                    );
+                                } else {
+                                    sseEmitter.send(value);
                                 }
                             }catch (Exception e){
                                 sseEmitter.completeWithError(e);
@@ -366,13 +370,17 @@ public class SysChatServiceImpl implements SysChatService {
 
         //获取绑定的知识库信息
         List<Long> kbIds = agentKbBindingMapper.selectKbIdsByAgentId(agent.getId());
-        List<KnowledgeBaseVODto> knowledgeBases = knowledgeBaseMapper.selectByIds(kbIds)
-                .stream()
-                .map(knowledgeBase -> new KnowledgeBaseVODto(
-                        knowledgeBase.getCollectionName(),
-                        knowledgeBase.getDescription()
-                ))
-                .collect(Collectors.toList());
+        List<KnowledgeBaseVODto> knowledgeBases = new ArrayList<>();
+
+        if (kbIds != null && !kbIds.isEmpty()) {
+            knowledgeBases = knowledgeBaseMapper.selectByIds(kbIds)
+                    .stream()
+                    .map(knowledgeBase -> new KnowledgeBaseVODto(
+                            knowledgeBase.getCollectionName(),
+                            knowledgeBase.getDescription()
+                    ))
+                    .collect(Collectors.toList());
+        }
 
         messageUpdateVODto.setKnowledgeBases(knowledgeBases);
 
@@ -383,22 +391,24 @@ public class SysChatServiceImpl implements SysChatService {
                 .bodyValue(messageUpdateVODto)
                 .retrieve()
                 .bodyToFlux(String.class)
-                .filter(response -> !response.trim().isEmpty())
+                .filter(s -> s != null && !s.trim().isEmpty())
                 .subscribe(
-                        response -> {
+                        data -> {
                             try {
-                                if (response.startsWith("data:")){
-                                    sseEmitter.send(response);
-                                } else if (response.startsWith("event: interrupt")) {
-
-                                    String interrupt_value_json = response.split("data:")[1].trim();
+                                String value = data.trim();
+                                if (value.startsWith("[INTERRUPT]")){
+                                    String interrupt_value_json = value.substring("[INTERRUPT]".length());
                                     Message tool_message = new Message();
                                     tool_message.setAgentId(agent.getId());
                                     tool_message.setRole("tool_confirm");
                                     tool_message.setContent(interrupt_value_json);
                                     messageService.save(tool_message);
 
-                                    sseEmitter.send(response);
+                                    sseEmitter.send(
+                                            SseEmitter.event().name("interrupt").data(interrupt_value_json)
+                                    );
+                                } else {
+                                    sseEmitter.send(value);
                                 }
                             }catch (Exception e){
                                 sseEmitter.completeWithError(e);

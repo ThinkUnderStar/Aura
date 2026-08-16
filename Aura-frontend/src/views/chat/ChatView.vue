@@ -7,7 +7,7 @@ import { toast } from '@/stores/toast'
 import type { Agent, MessageVO } from '@/types'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
 import ChatInput from '@/components/chat/ChatInput.vue'
-import ToolConfirmDialog from '@/components/chat/ToolConfirmDialog.vue'
+import ToolConfirmPanel from '@/components/chat/ToolConfirmPanel.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import AppEmpty from '@/components/ui/AppEmpty.vue'
@@ -36,6 +36,9 @@ const newAgentName = ref('')
 const creating = ref(false)
 const showClear = ref(false)
 const clearing = ref(false)
+const showBacktrackConfirm = ref(false)
+const backtrackConfirmMessage = ref('')
+const pendingBacktrack = ref<{ messageId: number; content: string } | null>(null)
 
 let abortController: AbortController | null = null
 
@@ -44,7 +47,8 @@ const hasMessages = computed(() => messages.value.length > 0 || streaming.value 
 
 async function scrollToBottom() {
   await nextTick()
-  scrollRef.value?.scrollTo({ top: scrollRef.value.scrollHeight, behavior: 'smooth' })
+  const el = scrollRef.value
+  if (el) el.scrollTop = el.scrollHeight
 }
 
 // ---------- 智能体 ----------
@@ -84,14 +88,16 @@ async function loadMessages(showSpinner = true) {
   if (showSpinner) loadingMessages.value = true
   try {
     const { data } = await chatApi.messages(currentAgentId.value, 1, 200)
-    // 后端按时间正序返回，这里保持展示顺序
+    // 后端按时间倒序返回（最新在前），反转成旧→新，让最新消息在底部
     const records = data.code === 200 ? data.data.records : []
     messages.value = [...records].reverse()
-    await scrollToBottom()
   } catch {
     messages.value = []
   } finally {
     loadingMessages.value = false
+    // 等消息列表渲染完成后再滚到底部，否则 scrollHeight 还是 0，滚动无效
+    await nextTick()
+    scrollToBottom()
   }
 }
 
@@ -115,14 +121,7 @@ function finalize() {
   streamingText.value = ''
   streaming.value = false
   awaitingInterrupt.value = false
-}
-
-function stopStreaming() {
-  abortController?.abort()
-  streaming.value = false
-  awaitingInterrupt.value = false
-  pendingInterrupt.value = null
-  finalize()
+  scrollToBottom()
 }
 
 function makeHandlers(): StreamHandlers {
@@ -135,6 +134,7 @@ function makeHandlers(): StreamHandlers {
       awaitingInterrupt.value = true
       pendingInterrupt.value = p
       streaming.value = false
+      scrollToBottom()
     },
     onDone: () => {
       if (!awaitingInterrupt.value) finalize()
@@ -148,10 +148,10 @@ function makeHandlers(): StreamHandlers {
   }
 }
 
-async function runStream(path: string, body: Record<string, unknown>) {
+async function runStream(path: string, body: Record<string, unknown>, method: 'POST' | 'PUT' = 'POST') {
   abortController = new AbortController()
   streaming.value = true
-  await streamChat(path, body, makeHandlers(), abortController.signal)
+  await streamChat(path, body, makeHandlers(), abortController.signal, method)
 }
 
 async function send(text: string) {
@@ -175,14 +175,14 @@ async function send(text: string) {
 }
 
 // ---------- 中断续接 ----------
-async function onChoose(option: string) {
+async function onChoose(option: string, edition?: string) {
   const agentId = currentAgentId.value
   pendingInterrupt.value = null
   if (!agentId) return
   awaitingInterrupt.value = false
   await runStream(`/chat/tool_allow/${agentId}`, {
     choice: option,
-    edition: option === 'edit' ? '' : undefined,
+    edition: option === 'edit' ? edition : '',
     enableWebSearch: webSearch.value ? 1 : 0,
   })
 }
@@ -207,6 +207,47 @@ async function clearConversation() {
   } finally {
     clearing.value = false
   }
+}
+
+// ---------- 回溯（编辑消息重新生成） ----------
+function onEditSubmit(message: MessageVO, newContent: string) {
+  if (streaming.value) return
+  const idx = messages.value.findIndex((m) => m.id === message.id)
+  const subsequent = idx >= 0 ? messages.value.length - 1 - idx : 0
+  if (subsequent > 0) {
+    pendingBacktrack.value = { messageId: message.id, content: newContent }
+    backtrackConfirmMessage.value = `将删除这条消息之后的 ${subsequent} 条对话，并从这条消息重新生成，且不可恢复。确定继续吗？`
+    showBacktrackConfirm.value = true
+  } else {
+    doBacktrack(message.id, newContent)
+  }
+}
+
+function confirmBacktrack() {
+  const p = pendingBacktrack.value
+  showBacktrackConfirm.value = false
+  pendingBacktrack.value = null
+  if (p) doBacktrack(p.messageId, p.content)
+}
+
+async function doBacktrack(messageId: number, content: string) {
+  const idx = messages.value.findIndex((m) => m.id === messageId)
+  if (idx >= 0) {
+    messages.value[idx].content = content
+    messages.value.splice(idx + 1)
+  }
+  streamingText.value = ''
+  awaitingInterrupt.value = false
+  pendingInterrupt.value = null
+  await scrollToBottom()
+  await runStream(
+    `/chat/update/${messageId}`,
+    {
+      humanContent: content,
+      enableWebSearch: webSearch.value ? 1 : 0,
+    },
+    'PUT',
+  )
 }
 
 // ---------- 路由联动 ----------
@@ -316,9 +357,15 @@ init()
 
       <!-- 消息列表 -->
       <div v-else class="mx-auto max-w-3xl space-y-6">
-        <MessageBubble v-for="m in messages" :key="m.id" :message="m" />
+        <MessageBubble
+          v-for="m in messages"
+          :key="m.id"
+          :message="m"
+          :disabled="streaming"
+          @edit-submit="onEditSubmit"
+        />
 
-        <!-- 流式输出气泡 -->
+        <!-- 流式输出气泡（最新在底部） -->
         <div v-if="streaming || streamingText" class="flex gap-3">
           <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink text-white">
             <span class="font-serif text-xs leading-none">A</span>
@@ -335,6 +382,14 @@ init()
             </div>
           </div>
         </div>
+
+        <!-- 工具调用确认（内联） -->
+        <ToolConfirmPanel
+          v-if="pendingInterrupt"
+          :payload="pendingInterrupt"
+          @choose="onChoose"
+          @cancel="onCancelInterrupt"
+        />
       </div>
     </div>
 
@@ -342,23 +397,11 @@ init()
     <div class="shrink-0 border-t border-line bg-surface px-4 py-3">
       <div class="mx-auto max-w-3xl">
         <ChatInput :disabled="!currentAgentId || streaming" @send="send" />
-        <div class="mt-2 flex items-center justify-between">
-          <button v-if="streaming" class="btn-danger-soft !px-3 !py-1 text-xs" @click="stopStreaming">
-            停止生成
-          </button>
-          <span v-else />
+        <div class="mt-2 flex justify-end">
           <span class="text-xs text-faint">Aura 可能出错，请核对重要信息</span>
         </div>
       </div>
     </div>
-
-    <!-- 工具调用确认 -->
-    <ToolConfirmDialog
-      :open="!!pendingInterrupt"
-      :payload="pendingInterrupt"
-      @choose="onChoose"
-      @cancel="onCancelInterrupt"
-    />
 
     <!-- 新建智能体 -->
     <AppModal :open="showCreate" title="新建智能体" @close="showCreate = false">
@@ -383,6 +426,17 @@ init()
       :loading="clearing"
       @confirm="clearConversation"
       @cancel="showClear = false"
+    />
+
+    <!-- 回溯确认 -->
+    <AppConfirm
+      :open="showBacktrackConfirm"
+      title="重新生成后续对话"
+      :message="backtrackConfirmMessage"
+      confirm-text="继续"
+      :danger="true"
+      @confirm="confirmBacktrack"
+      @cancel="showBacktrackConfirm = false"
     />
   </div>
 </template>

@@ -395,7 +395,7 @@ onMounted(() => {
               <AppIcon name="clock" :size="14" />
             </div>
             <div class="min-w-0 flex-1">
-              <p class="text-sm text-ink">{{ log.summary || `${log.module} · ${log.action}` }}</p>
+              <p class="text-sm text-ink">{{ log.requestSummary || `${log.module} · ${log.operation}` }}</p>
               <p class="mt-0.5 text-xs text-faint">{{ log.module }} · {{ formatTime(log.createTime, false) }}</p>
             </div>
           </li>

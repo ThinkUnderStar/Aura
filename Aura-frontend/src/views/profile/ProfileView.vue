@@ -15,7 +15,10 @@ const router = useRouter()
 const auth = useAuthStore()
 
 const form = ref({ username: '', email: '' })
-const saving = ref(false)
+const emailCode = ref('')
+const savingUsername = ref(false)
+const sendingCode = ref(false)
+const savingEmail = ref(false)
 const avatarInput = ref<HTMLInputElement | null>(null)
 const uploadingAvatar = ref(false)
 
@@ -35,20 +38,50 @@ function syncForm() {
 }
 syncForm()
 
-async function saveProfile() {
-  if (!form.value.username.trim()) return toast.error('用户名不能为空')
-  saving.value = true
+async function saveUsername() {
+  const username = form.value.username.trim()
+  if (!username) return toast.error('用户名不能为空')
+  savingUsername.value = true
   try {
-    await userApi.update({ username: form.value.username.trim(), email: form.value.email.trim() || undefined })
-    toast.success('已保存')
-    if (auth.user) {
-      auth.user.username = form.value.username.trim()
-      auth.user.email = form.value.email.trim() || null
-    }
+    await userApi.updateUsername(username)
+    toast.success('用户名已保存')
+    auth.updateUser({ username })
   } catch {
     /* 拦截器已提示 */
   } finally {
-    saving.value = false
+    savingUsername.value = false
+  }
+}
+
+async function sendEmailCode() {
+  const email = form.value.email.trim()
+  if (!email) return toast.error('请先填写邮箱')
+  sendingCode.value = true
+  try {
+    await authApi.sendCode(email, 'reset')
+    toast.success('验证码已发送')
+  } catch {
+    /* 拦截器已提示 */
+  } finally {
+    sendingCode.value = false
+  }
+}
+
+async function saveEmail() {
+  const email = form.value.email.trim()
+  const code = emailCode.value.trim()
+  if (!email) return toast.error('请先填写邮箱')
+  if (!code) return toast.error('请输入邮箱验证码')
+  savingEmail.value = true
+  try {
+    await userApi.updateEmail(email, code)
+    toast.success('邮箱已绑定')
+    auth.updateUser({ email })
+    emailCode.value = ''
+  } catch {
+    /* 拦截器已提示 */
+  } finally {
+    savingEmail.value = false
   }
 }
 
@@ -59,7 +92,7 @@ async function onAvatar(e: Event) {
   uploadingAvatar.value = true
   try {
     const { data } = await userApi.uploadAvatar(file)
-    if (data.code === 200 && data.data && auth.user) auth.user.avatar = data.data
+    if (data.code === 200 && data.data) auth.updateUser({ avatar: data.data })
     toast.success('头像已更新')
   } catch {
     /* 拦截器已提示 */
@@ -86,8 +119,10 @@ async function saveGenerated() {
   if (!generated.value) return
   savingGenerated.value = true
   try {
-    const { data } = await userApi.saveGeneratedAvatar(generated.value)
-    if (data.code === 200 && data.data && auth.user) auth.user.avatar = data.data
+    // 后端期望的是纯文件名（不含 /temp_images/ 前缀），且 isSaved=1 表示保存为头像
+    const imageName = generated.value.replace(/^\/temp_images\//, '')
+    const { data } = await userApi.saveGeneratedAvatar(imageName, 1)
+    if (data.code === 200 && data.data) auth.updateUser({ avatar: data.data })
     toast.success('头像已保存')
     showGenerate.value = false
     generated.value = null
@@ -154,17 +189,29 @@ async function deleteAccount() {
       <div class="space-y-4">
         <div>
           <label class="label">用户名</label>
-          <input v-model="form.username" class="input" />
+          <div class="flex gap-2">
+            <input v-model="form.username" class="input flex-1" />
+            <button class="btn-secondary shrink-0" :disabled="savingUsername" @click="saveUsername">
+              <AppIcon v-if="savingUsername" name="refresh" :size="14" class="animate-spin" />
+              保存
+            </button>
+          </div>
         </div>
         <div>
           <label class="label">邮箱</label>
-          <input v-model="form.email" class="input" placeholder="可选" />
-        </div>
-        <div class="flex justify-end">
-          <button class="btn-primary" :disabled="saving" @click="saveProfile">
-            <AppIcon v-if="saving" name="refresh" :size="14" class="animate-spin" />
-            保存修改
-          </button>
+          <div class="flex gap-2">
+            <input v-model="form.email" class="input flex-1" placeholder="绑定邮箱" />
+            <button class="btn-secondary shrink-0" :disabled="sendingCode" @click="sendEmailCode">
+              {{ sendingCode ? '发送中…' : '发送验证码' }}
+            </button>
+          </div>
+          <div class="mt-2 flex gap-2">
+            <input v-model="emailCode" class="input flex-1" placeholder="邮箱验证码" />
+            <button class="btn-primary shrink-0" :disabled="savingEmail" @click="saveEmail">
+              <AppIcon v-if="savingEmail" name="refresh" :size="14" class="animate-spin" />
+              确认绑定
+            </button>
+          </div>
         </div>
       </div>
     </div>

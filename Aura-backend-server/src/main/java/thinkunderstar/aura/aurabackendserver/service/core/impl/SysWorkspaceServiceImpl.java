@@ -275,7 +275,7 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
 
         String logo = "/workspace_logos/"+workspaceId+"-"+System.currentTimeMillis()+"-aura."+ext;
         try {
-            file.transferTo(Path.of("./docs"+logo).toFile());
+            file.transferTo(Path.of("./docs"+logo).toAbsolutePath().toFile());
         } catch (IOException e) {
             log.error("团队:"+workspaceId+"的logo文件上传失败");
             throw new BusinessException("团队logo文件上传失败");
