@@ -31,14 +31,17 @@ export const authApi = {
 
 // ============ 用户 ============
 export const userApi = {
-  update: (data: { username?: string; email?: string }) => http.put<Result<void>>('/user/update', data),
+  updateUsername: (username: string) => http.put<Result<void>>('/user/update', { type: 'username', username }),
+  updateEmail: (email: string, code: string) => http.put<Result<void>>('/user/update', { type: 'email', email, code }),
   uploadAvatar: (file: File) => {
     const fd = new FormData()
     fd.append('file', file)
     return http.put<Result<string>>('/user/avatar', fd)
   },
-  generateAvatar: (prompt: string) => http.post<Result<string>>('/user/avatar/generate', { prompt }),
-  saveGeneratedAvatar: (fileName: string) => http.post<Result<string>>('/user/avatar/generate/save', { fileName }),
+  generateAvatar: (prompt: string) =>
+    http.post<Result<string>>('/user/avatar/generate', { prompt }, { timeout: 300_000 }),
+  saveGeneratedAvatar: (imageName: string, isSaved = 1) =>
+    http.post<Result<string>>('/user/avatar/generate/save', { imageName, isSaved }),
 }
 
 // ============ 智能体 ============
@@ -69,6 +72,7 @@ export const kbApi = {
   list: (page = 1, pageSize = 20) =>
     http.get<Result<Page<KnowledgeBase>>>('/kb/get', { params: { page, pageSize } }),
   team: (workspaceId: number) => http.get<Result<KnowledgeBase>>(`/kb/get/${workspaceId}`),
+  detail: (kbId: number) => http.get<Result<KnowledgeBase>>(`/kb/detail/${kbId}`),
   updateMy: (data: { id: number; name?: string; description?: string }) =>
     http.put<Result<KnowledgeBase>>('/kb/update/my', data),
   updateTeam: (data: { id: number; type: 'name' | 'description'; value: string }) =>
@@ -97,7 +101,10 @@ export const docApi = {
 // ============ 团队 ============
 export const wsApi = {
   list: (page = 1, size = 20) => http.get<Result<Page<WorkspaceVO>>>('/workspace/get', { params: { page, size } }),
-  create: (data: { name: string; description?: string }) => http.post<Result<WorkspaceVO>>('/workspace/create', data),
+  search: (keyWord: string, page = 1, size = 20) =>
+    http.get<Result<Page<WorkspaceVO>>>('/workspace/search', { params: { keyWord, page, size } }),
+  create: (data: { name: string; description?: string; kbName: string; kbDescription: string }) =>
+    http.post<Result<WorkspaceVO>>('/workspace/create', data),
   update: (data: { workspaceId: number; name?: string; description?: string }) =>
     http.post<Result<WorkspaceVO>>('/workspace/update', data),
   uploadLogo: (workspaceId: number, file: File) => {
@@ -159,13 +166,20 @@ export const logApi = {
 }
 
 // ============ 管理后台（role=2） ============
-// 注意：后端暂无「用户分页列表」接口，用户管理页暂以占位呈现，待后端补充后接入。
 export const adminApi = {
-  banUser: (data: { targetUserId: number; type: number; banReason?: string; banTime?: number }) =>
-    http.put<Result<void>>('/auth/ban', data),
-  unbanUser: (targetUserId: number) => http.put<Result<void>>('/auth/unban', null, { params: { targetUserId } }),
+  registerAdmin: (data: {
+    username: string
+    password: string
+    repeatPassword: string
+    email: string
+    emailCode: string
+    phone: string
+    phoneCode: string
+  }) => http.post<Result<void>>('/auth/register/admin', data),
   workspaces: (page = 1, size = 20) =>
     http.get<Result<Page<Workspace>>>('/workspace/get/all', { params: { page, size } }),
+  searchWorkspaces: (keyWord: string, page = 1, size = 20) =>
+    http.get<Result<Page<Workspace>>>('/workspace/search/all', { params: { keyWord, page, size } }),
   banWorkspace: (workspaceId: number) =>
     http.delete<Result<OperationLog[]>>('/workspace/ban', { params: { workspaceId } }),
   unbanWorkspace: (workspaceId: number, kbId: number) =>
@@ -180,6 +194,3 @@ export const adminApi = {
   handleReport: (data: { reportId: number; status: number; handleResult: string }) =>
     http.put<Result<void>>('/report/handle', data),
 }
-
-// 注意：后端目前没有独立的「用户分页列表」接口（封禁只通过 /auth/ban 指定 id）。
-// 管理后台用户列表需后端补充；此处 adminApi.users 为占位，待后端提供后启用。

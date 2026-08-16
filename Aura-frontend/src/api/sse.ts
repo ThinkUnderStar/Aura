@@ -29,11 +29,12 @@ export async function streamChat(
   body: Record<string, unknown>,
   handlers: StreamHandlers,
   signal?: AbortSignal,
+  method: 'POST' | 'PUT' = 'POST',
 ): Promise<void> {
   let response: Response
   try {
     response = await fetch(`${API_BASE}${path}`, {
-      method: 'POST',
+      method,
       headers: { 'Content-Type': 'application/json', satoken: getToken() },
       body: JSON.stringify(toSnakeCase(body)),
       signal,
@@ -65,6 +66,20 @@ export async function streamChat(
     if ((e as Error)?.name === 'AbortError') return
     handlers.onError('读取响应流失败')
   }
+}
+
+// 文本分片由 Python 端 JSON 编码（换行、引号等被转义），这里解码还原。
+// 否则 markdown 的换行会在 SSE 链路中被吞掉，流式输出会坍成一坨原始文本。
+function decodeText(content: string): string {
+  const s = content.trimStart()
+  if (s.startsWith('"')) {
+    try {
+      return JSON.parse(s) as string
+    } catch {
+      /* 解码失败按原文兜底 */
+    }
+  }
+  return content
 }
 
 function createSSEParser(handlers: StreamHandlers) {
@@ -116,7 +131,7 @@ function createSSEParser(handlers: StreamHandlers) {
       }
     }
 
-    handlers.onText(content)
+    handlers.onText(decodeText(content))
   }
 
   function feed(chunk: string) {

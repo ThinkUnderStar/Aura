@@ -1,3 +1,4 @@
+import logging
 from typing import List
 from langchain_classic.retrievers import MultiQueryRetriever, ContextualCompressionRetriever
 from langchain_classic.retrievers.document_compressors import CrossEncoderReranker, LLMChainExtractor, \
@@ -35,6 +36,7 @@ pipline = DocumentCompressorPipeline(
     ]
 )
 
+
 async def rag_ask(question: str, collection_name: str) -> List[Document]:
     """
     单个向量数据库rag检索增强流程实现
@@ -42,8 +44,11 @@ async def rag_ask(question: str, collection_name: str) -> List[Document]:
     :param collection_name: milvus collection name
     :return: 从知识库查询的结果
     """
+    logging.info(f"rag_ask 开始 collection={collection_name} question={question!r}")
+
     #将该集合加载到内存中
     await milvus_client.load_collection(collection_name)
+    logging.info(f"rag_ask 集合已加载 {collection_name}")
 
     vector_store = Milvus(
         collection_name=collection_name,
@@ -73,7 +78,9 @@ async def rag_ask(question: str, collection_name: str) -> List[Document]:
         base_compressor=pipline
     )
 
+    logging.info(f"rag_ask 开始检索 {collection_name}")
     search_result =  await retriever.ainvoke(question)
+    logging.info(f"rag_ask 检索完成 {collection_name} 命中 {len(search_result)} 条")
 
     await milvus_client.release_collection(collection_name)
 

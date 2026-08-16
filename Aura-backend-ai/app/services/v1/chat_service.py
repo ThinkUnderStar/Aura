@@ -2,7 +2,7 @@ import json
 import logging
 from typing import AsyncGenerator
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.types import Command
 
@@ -10,6 +10,8 @@ from app.db.milvus.client import milvus_client
 from app.db.postgresql import connect as pg_connect
 from app.models.request import ChatDto, ToolAllowDto, UpdateMessageDto
 from app.models.response import Result
+from app.services.agent.prompts import DEFAULT_SYSTEM_PROMPT
+
 
 async def chat_with_agent_service(agent_id: int,chat_dto: ChatDto) -> AsyncGenerator[str,None]:
     """
@@ -47,11 +49,21 @@ async def chat_with_agent_service(agent_id: int,chat_dto: ChatDto) -> AsyncGener
         configurable={"thread_id": "aura-thread-"+str(agent_id)}
     ))
 
+    #创建追加的messages列表
+    messages = []
+
     if snapshot:
         checkpoint_id = snapshot.config["configurable"]["checkpoint_id"]
     else:
         # 处理没有找到对应 checkpoint 的情况
         checkpoint_id = None
+
+    system_message: SystemMessage
+    if checkpoint_id == None:
+        system_message = SystemMessage(content=DEFAULT_SYSTEM_PROMPT)
+        messages.append(system_message)
+
+    messages.append(HumanMessage(content=chat_dto.human_content))
 
     config = {
         "configurable": {
@@ -67,27 +79,31 @@ async def chat_with_agent_service(agent_id: int,chat_dto: ChatDto) -> AsyncGener
 
     # 创建异步生成器
     astream = pg_connect.aura_agent.astream_events(
-        input={"messages": [HumanMessage(content=chat_dto.human_content)]},
+        input={"messages": messages},
         config=config,
         version="v2",
     )
  
     async for event in astream:
         if event["event"] == "on_chat_model_stream":
-            content = event["data"]["chunk"]["content"]
+            content = event["data"]["chunk"].content
 
             if content != "":
-                yield f"data: {content}\n\n"
+                yield f"data: {json.dumps(content)}\n\n"
 
-        if event["event"] == "interrupt":
-            value = event["data"]["value"]
+        if (
+            event["event"] == "on_chain_stream"
+            and isinstance(event["data"].get("chunk"), dict)
+            and "__interrupt__" in event["data"]["chunk"]
+        ):
+            value = event["data"]["chunk"]["__interrupt__"][0].value
             value_json = json.dumps(value)
 
-            yield f"event: interrupt\ndata: {value_json}\n\n"
+            yield f"data: [INTERRUPT]{value_json}\n\n"
 
         if event["event"] == "on_chain_end" and event["name"] == "sensitive_content_handler":
-            content = event["data"]["output"]["messages"][0]["content"]
-            yield f"data: {content}\n\n"
+            content = event["data"]["output"]["messages"][0].content
+            yield f"data: {json.dumps(content)}\n\n"
 
 
 async def tool_allow_service(
@@ -154,16 +170,20 @@ async def tool_allow_service(
 
     async for event in astream:
         if event["event"] == "on_chat_model_stream":
-            content = event["data"]["chunk"]["content"]
+            content = event["data"]["chunk"].content
 
             if content != "":
-                yield f"data: {content}\n\n"
+                yield f"data: {json.dumps(content)}\n\n"
 
-        if event["event"] == "interrupt":
-            value = event["data"]["value"]
+        if (
+            event["event"] == "on_chain_stream"
+            and isinstance(event["data"].get("chunk"), dict)
+            and "__interrupt__" in event["data"]["chunk"]
+        ):
+            value = event["data"]["chunk"]["__interrupt__"][0].value
             value_json = json.dumps(value)
 
-            yield f"event: interrupt\ndata: {value_json}\n\n"
+            yield f"data: [INTERRUPT]{value_json}\n\n"
 
 async def clear_session_message_service(
         agent_id: int
@@ -259,13 +279,17 @@ async def update_message_service(
         - 本函数不包含权限校验，权限校验由 Java 端和路由层负责。
     """
     collection_name = f"aura_agent_{update_message_dto.message.agent_id}_session_memory"
+    messages = []
     if update_message_dto.message.from_checkpoint_id == None:
         await clear_session_message_service(update_message_dto.message.agent_id)
+        messages.append(SystemMessage(content=DEFAULT_SYSTEM_PROMPT))
     else:
         await milvus_client.delete(
             collection_name=collection_name,
             filter=f"create_time >= '{update_message_dto.message.create_time.isoformat()}'"
         )
+
+    messages.append(HumanMessage(content=update_message_dto.human_content))
 
     config = {
         "configurable": {
@@ -281,27 +305,31 @@ async def update_message_service(
     }
 
     astream = pg_connect.aura_agent.astream_events(
-        input={"messages": HumanMessage(content=update_message_dto.human_content)},
+        input={"messages": messages},
         config=config,
         version="v2",
     )
 
     async for event in astream:
         if event["event"] == "on_chat_model_stream":
-            content = event["data"]["chunk"]["content"]
+            content = event["data"]["chunk"].content
 
             if content != "":
-                yield f"data: {content}\n\n"
+                yield f"data: {json.dumps(content)}\n\n"
 
-        if event["event"] == "interrupt":
-            value = event["data"]["value"]
+        if (
+            event["event"] == "on_chain_stream"
+            and isinstance(event["data"].get("chunk"), dict)
+            and "__interrupt__" in event["data"]["chunk"]
+        ):
+            value = event["data"]["chunk"]["__interrupt__"][0].value
             value_json = json.dumps(value)
 
-            yield f"event: interrupt\ndata: {value_json}\n\n"
+            yield f"data: [INTERRUPT]{value_json}\n\n"
 
         if event["event"] == "on_chain_end" and event["name"] == "sensitive_content_handler":
-            content = event["data"]["output"]["messages"][0]["content"]
-            yield f"data: {content}\n\n"
+            content = event["data"]["output"]["messages"][0].content
+            yield f"data: {json.dumps(content)}\n\n"
 
 
 

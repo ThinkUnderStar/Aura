@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { agentApi, kbApi } from '@/api'
 import { toast } from '@/stores/toast'
@@ -108,8 +108,8 @@ async function openBind(agent: Agent) {
       kbApi.list(1, 100),
       agentApi.bindingKbs(agent.id),
     ])
-    personalKbs.value = kbs.data.code === 200 ? kbs.data.data.records.filter((k) => k.isTeam === 0) : []
-    boundIds.value = bound.data.code === 200 ? bound.data.data.personalKbIds ?? [] : []
+    personalKbs.value = kbs.data.code === 200 ? kbs.data.data.records.filter((k) => k.isTeam === 0 && k.status === 1) : []
+    boundIds.value = bound.data.code === 200 ? bound.data.data.kbIds ?? [] : []
   } catch {
     personalKbs.value = []
   } finally {
@@ -136,6 +136,9 @@ function toggleKb(id: number) {
   if (i >= 0) boundIds.value.splice(i, 1)
   else boundIds.value.push(id)
 }
+
+const boundKbs = computed(() => personalKbs.value.filter((k) => boundIds.value.includes(k.id)))
+const availableKbs = computed(() => personalKbs.value.filter((k) => !boundIds.value.includes(k.id)))
 
 onMounted(load)
 </script>
@@ -234,31 +237,77 @@ onMounted(load)
 
     <!-- 关联知识库 -->
     <AppModal :open="!!binding" title="关联知识库" width="max-w-lg" @close="binding = null">
-      <p class="text-sm text-faint">为「{{ binding?.name }}」选择可用的个人知识库。</p>
+      <p class="text-sm text-faint">为「{{ binding?.name }}」勾选可用的个人知识库。</p>
       <div v-if="bindingLoading" class="flex justify-center py-8">
         <AppSpinner />
       </div>
-      <div v-else-if="!personalKbs.length" class="py-8 text-center text-sm text-faint">
-        暂无可关联的个人知识库，请先在「知识库」中创建。
-      </div>
-      <div v-else class="mt-4 max-h-72 space-y-1 overflow-y-auto">
-        <label
-          v-for="kb in personalKbs"
-          :key="kb.id"
-          class="flex cursor-pointer items-center gap-3 rounded-sm px-3 py-2.5 transition-colors hover:bg-surface-muted"
-        >
-          <input
-            type="checkbox"
-            class="accent-black"
-            :checked="boundIds.includes(kb.id)"
-            @change="toggleKb(kb.id)"
-          />
-          <div class="min-w-0 flex-1">
-            <p class="truncate text-sm text-ink">{{ kb.name }}</p>
-            <p class="text-xs text-faint">{{ kb.docCount }} 篇文档</p>
+      <template v-else>
+        <div class="mt-4 max-h-[50vh] overflow-y-auto pr-1">
+          <!-- 已绑定 -->
+          <div>
+            <div class="mb-1.5 flex items-center gap-2 px-1">
+              <span class="text-xs font-medium text-ink">已绑定</span>
+              <span class="rounded-full bg-surface-muted px-2 py-0.5 text-xs text-faint">{{ boundKbs.length }}</span>
+            </div>
+            <div v-if="!boundKbs.length" class="rounded-sm border border-dashed border-line px-3 py-4 text-center text-xs text-faint">
+              尚未绑定任何知识库
+            </div>
+            <div v-else class="space-y-1">
+              <div
+                v-for="kb in boundKbs"
+                :key="kb.id"
+                class="flex items-center gap-3 rounded-sm bg-surface-muted px-3 py-2.5"
+              >
+                <span class="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm bg-ink text-canvas">
+                  <AppIcon name="check" :size="11" />
+                </span>
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm text-ink">{{ kb.name }}</p>
+                  <p class="text-xs text-faint">{{ kb.docCount }} 篇文档</p>
+                </div>
+                <button
+                  class="rounded-sm p-1.5 text-faint transition-colors hover:bg-surface hover:text-red-text"
+                  title="取消绑定"
+                  @click="toggleKb(kb.id)"
+                >
+                  <AppIcon name="x" :size="14" />
+                </button>
+              </div>
+            </div>
           </div>
-        </label>
-      </div>
+
+          <!-- 可绑定 -->
+          <div class="mt-5">
+            <div class="mb-1.5 flex items-center gap-2 px-1">
+              <span class="text-xs font-medium text-ink">可绑定</span>
+              <span class="rounded-full bg-surface-muted px-2 py-0.5 text-xs text-faint">{{ availableKbs.length }}</span>
+            </div>
+            <div v-if="!availableKbs.length" class="rounded-sm border border-dashed border-line px-3 py-4 text-center text-xs text-faint">
+              暂无可绑定的知识库，请先在「知识库」中创建。
+            </div>
+            <div v-else class="space-y-1">
+              <div
+                v-for="kb in availableKbs"
+                :key="kb.id"
+                class="flex items-center gap-3 rounded-sm px-3 py-2.5 transition-colors hover:bg-surface-muted"
+              >
+                <span class="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-line-strong"></span>
+                <div class="min-w-0 flex-1">
+                  <p class="truncate text-sm text-ink">{{ kb.name }}</p>
+                  <p class="text-xs text-faint">{{ kb.docCount }} 篇文档</p>
+                </div>
+                <button
+                  class="rounded-sm p-1.5 text-faint transition-colors hover:bg-surface hover:text-ink"
+                  title="绑定"
+                  @click="toggleKb(kb.id)"
+                >
+                  <AppIcon name="plus" :size="14" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
       <div class="mt-5 flex justify-end gap-2">
         <button class="btn-secondary" @click="binding = null">取消</button>
         <button class="btn-primary" :disabled="bindingBusy" @click="saveBind">保存</button>

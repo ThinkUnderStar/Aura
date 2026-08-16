@@ -43,8 +43,8 @@ const statusBadge = (s: number) =>
 
 async function loadKb() {
   try {
-    const { data } = await kbApi.list(1, 100)
-    kb.value = data.code === 200 ? (data.data.records.find((k) => k.id === kbId.value) ?? null) : null
+    const { data } = await kbApi.detail(kbId.value)
+    kb.value = data.code === 200 ? data.data : null
     if (kb.value) {
       editForm.value = { name: kb.value.name, description: kb.value.description ?? '' }
     }

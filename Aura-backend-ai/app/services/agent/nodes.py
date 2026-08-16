@@ -29,7 +29,12 @@ async def llm_node(state:State) -> State:
     :param state: 各个节点相互通信的通信类对象
     :return: State
     """
-    response = await chat_llm_with_tools.ainvoke(state.messages)
+    response = None
+    async for chunk in chat_llm_with_tools.astream(state.messages):
+        response = chunk if response is None else response + chunk
+
+    if response is None:
+        response = AIMessage(content="")
 
     if response.tool_calls:
         return Command(
@@ -234,19 +239,12 @@ async def relevant_user_memories(state:State,config:RunnableConfig) -> State:
     })
 
     old_system = state.messages[0]
-    if isinstance(old_system,SystemMessage):
-        new_system = SystemMessage(
-            content=system_prompt.to_string(),
-            id=old_system.id  # 保留相同 id，触发覆盖
-        )
+    new_system = SystemMessage(
+        content=system_prompt.to_string(),
+        id=old_system.id  # 保留相同 id，触发覆盖
+    )
 
-        return {"messages": [new_system]}
-    else:
-        new_system = SystemMessage(
-            content=system_prompt.to_string()
-        )
-
-        return {"messages": [new_system] + state.messages}
+    return {"messages": [new_system]}
 
 #创建压缩对话节点（减少Token消耗）
 summarization_node  = SummarizationNode(

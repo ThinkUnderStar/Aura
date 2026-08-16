@@ -85,7 +85,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public Result<Void> sendCode(String username,String way) {
         if(!(way.equals("login") || way.equals("register") || way.equals("reset"))) {
-            throw new AuthException("验证码用途有问题");
+            throw new BusinessException("验证码用途有问题");
         }
 
         //1为手机号，2为邮箱地址,0为格式错误
@@ -98,7 +98,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         if(whichName == 0){
-            throw new AuthException("用户名格式有误");
+            throw new BusinessException("用户名格式有误");
         }
 
         String sendCodeLock = username + ":aura:sendCodeLock:" + way;
@@ -124,42 +124,42 @@ public class AuthServiceImpl implements AuthService {
     public Result<Void> registerUser( RegisterUserDto registerDto) {
         //格式验证
         if (registerDto.getUsername() == null || registerDto.getUsername().isEmpty()) {
-            throw new AuthException("用户昵称不能为空");
+            throw new BusinessException("用户昵称不能为空");
         }
 
         if (!ValidateUtils.usernameValidate(registerDto.getUsername())) {
-            throw new AuthException("用户昵称格式不符合规定");
+            throw new BusinessException("用户昵称格式不符合规定");
         }
 
         if (registerDto.getPassword() == null || registerDto.getPassword().isEmpty()) {
-            throw new AuthException("用户密码不能为空");
+            throw new BusinessException("用户密码不能为空");
         }
 
         if (!ValidateUtils.passwordValidate(registerDto.getPassword())) {
-            throw new AuthException("用户密码格式不符合规定");
+            throw new BusinessException("用户密码格式不符合规定");
         }
 
         if (registerDto.getPhone() == null || registerDto.getPhone().isEmpty()) {
-            throw new AuthException("手机号不能为空");
+            throw new BusinessException("手机号不能为空");
         }
 
         if (!ValidateUtils.phoneValidate(registerDto.getPhone())) {
-            throw new AuthException("用户手机号不合规");
+            throw new BusinessException("用户手机号不合规");
         }
 
         if (!registerDto.getPassword().equals(registerDto.getRepeatPassword())) {
-            throw new AuthException("两次输入的密码不一致");
+            throw new BusinessException("两次输入的密码不一致");
         }
 
         boolean IpLimiter = redisTokenBucketLimiter.tryAcquireByIp(IpUtils.getClientIp(httpServletRequest), 3, 1);
         if (!IpLimiter) {
-            throw new AuthException("注册过于繁忙，请稍后再试");
+            throw new BusinessException("注册过于繁忙，请稍后再试");
         }
 
         User user = userService.getOne(new LambdaQueryWrapper<User>().eq(User::getPhone, registerDto.getPhone()));
 
         if (user != null && user.getDeleted() != 1) {
-            throw new AuthException("该手机号已被其他账户绑定");
+            throw new BusinessException("该手机号已被其他账户绑定");
         }
 
         if (
@@ -168,7 +168,7 @@ public class AuthServiceImpl implements AuthService {
                 !registerDto.getCode()
                 .equals(redisUtils.get(registerDto.getPhone()+":aura:codeExistLock:register"))
         ){
-            throw new AuthException("验证码有误");
+            throw new BusinessException("验证码有误");
         }
 
         //覆盖软删除且同手机号的用户对象
@@ -272,9 +272,9 @@ public class AuthServiceImpl implements AuthService {
 
         if(loginDto.getUsername() == null || (loginDto.getPassword() == null && loginDto.getCode() == null)){
             if(loginDto.getLoginWay() == 1) {
-                throw new AuthException("用户名或密码不能为空");
+                throw new BusinessException("用户名或密码不能为空");
             }else {
-                throw new AuthException("用户名或验证码不能为空");
+                throw new BusinessException("用户名或验证码不能为空");
             }
         }
 
@@ -285,13 +285,13 @@ public class AuthServiceImpl implements AuthService {
         }
 
         if(whichName == 0){
-            throw new AuthException("用户名格式有问题");
+            throw new BusinessException("用户名格式有问题");
         }
 
         boolean right = redisTokenBucketLimiter.tryAcquireByIp(IpUtils.getClientIp(httpServletRequest), 5, 2);
 
         if(!right){
-            throw new AuthException("登陆过于频繁");
+            throw new BusinessException("登陆过于频繁");
         }
 
         return whichName;
@@ -409,39 +409,39 @@ public class AuthServiceImpl implements AuthService {
     public Result<Void> registerAdmin(RegisterAdminDto registerDto) {
         //格式验证
         if (registerDto.getUsername() == null || registerDto.getUsername().isEmpty()) {
-            throw new AuthException("管理员昵称不能为空");
+            throw new BusinessException("管理员昵称不能为空");
         }
 
         if (!ValidateUtils.usernameValidate(registerDto.getUsername())) {
-            throw new AuthException("管理员昵称格式不符合规定");
+            throw new BusinessException("管理员昵称格式不符合规定");
         }
 
         if (registerDto.getPassword() == null || registerDto.getPassword().isEmpty()) {
-            throw new AuthException("管理员密码不能为空");
+            throw new BusinessException("管理员密码不能为空");
         }
 
         if (!ValidateUtils.passwordValidate(registerDto.getPassword())) {
-            throw new AuthException("管理员密码格式不符合规定");
+            throw new BusinessException("管理员密码格式不符合规定");
         }
 
         if (registerDto.getPhone() == null || registerDto.getPhone().isEmpty()) {
-            throw new AuthException("手机号不能为空");
+            throw new BusinessException("手机号不能为空");
         }
 
         if (!ValidateUtils.phoneValidate(registerDto.getPhone())) {
-            throw new AuthException("管理员手机号不合规");
+            throw new BusinessException("管理员手机号不合规");
         }
 
         if (registerDto.getEmail() == null || registerDto.getEmail().isEmpty()) {
-            throw new AuthException("邮箱地址不能为空");
+            throw new BusinessException("邮箱地址不能为空");
         }
 
         if (!ValidateUtils.emailValidate(registerDto.getEmail())) {
-            throw new AuthException("管理员邮箱地址不合规");
+            throw new BusinessException("管理员邮箱地址不合规");
         }
 
         if (!registerDto.getPassword().equals(registerDto.getRepeatPassword())) {
-            throw new AuthException("两次输入的密码不一致");
+            throw new BusinessException("两次输入的密码不一致");
         }
 
         boolean IpLimiter = redisTokenBucketLimiter.tryAcquireByIp(
@@ -450,13 +450,13 @@ public class AuthServiceImpl implements AuthService {
                 1
         );
         if (!IpLimiter) {
-            throw new AuthException("注册过于繁忙，请稍后再试");
+            throw new BusinessException("注册过于繁忙，请稍后再试");
         }
 
         User userPhone = userService.getOne(new LambdaQueryWrapper<User>().eq(User::getPhone, registerDto.getPhone()));
 
         if (userPhone != null && userPhone.getDeleted() != 1) {
-            throw new AuthException("该手机号已被其他账号绑定");
+            throw new BusinessException("该手机号已被其他账号绑定");
         }
 
         if (
@@ -465,7 +465,7 @@ public class AuthServiceImpl implements AuthService {
                         !registerDto.getPhoneCode()
                                 .equals(redisUtils.get(registerDto.getPhone()+":aura:codeExistLock:register"))
         ){
-            throw new AuthException("手机验证码有误");
+            throw new BusinessException("手机验证码有误");
         }
 
         //覆盖软删除且同手机号的用户对象
@@ -476,7 +476,7 @@ public class AuthServiceImpl implements AuthService {
         User userEmail = userService.getOne(new LambdaQueryWrapper<User>().eq(User::getEmail, registerDto.getEmail()));
 
         if (userEmail != null && userEmail.getDeleted() != 1) {
-            throw new AuthException("该邮箱已被其他账号绑定");
+            throw new BusinessException("该邮箱已被其他账号绑定");
         }
 
         if (
@@ -485,7 +485,7 @@ public class AuthServiceImpl implements AuthService {
                         !registerDto.getEmailCode()
                                 .equals(redisUtils.get(registerDto.getEmail()+":aura:codeExistLock:register"))
         ){
-            throw new AuthException("邮箱验证码有误");
+            throw new BusinessException("邮箱验证码有误");
         }
 
         //覆盖软删除且同邮箱的用户对象

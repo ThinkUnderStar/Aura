@@ -17,9 +17,10 @@ const router = useRouter()
 
 const workspaces = ref<WorkspaceVO[]>([])
 const loading = ref(false)
+const keyword = ref('')
 
 const showCreate = ref(false)
-const createForm = ref({ name: '', description: '' })
+const createForm = ref({ name: '', description: '', kbName: '', kbDescription: '' })
 const creating = ref(false)
 
 const showJoin = ref(false)
@@ -46,7 +47,8 @@ const STATUS: Record<number, { tone: 'green' | 'red' | 'gray'; label: string }> 
 async function load() {
   loading.value = true
   try {
-    const { data } = await wsApi.list(1, 100)
+    const kw = keyword.value.trim()
+    const { data } = kw ? await wsApi.search(kw, 1, 100) : await wsApi.list(1, 100)
     workspaces.value = data.code === 200 ? data.data.records : []
   } catch {
     workspaces.value = []
@@ -55,14 +57,28 @@ async function load() {
   }
 }
 
+function clearSearch() {
+  keyword.value = ''
+  load()
+}
+
 async function create() {
   const name = createForm.value.name.trim()
   if (!name) return toast.error('请输入团队名称')
+  const kbName = createForm.value.kbName.trim()
+  if (!kbName) return toast.error('请输入团队知识库名称')
+  const kbDescription = createForm.value.kbDescription.trim()
+  if (!kbDescription) return toast.error('请输入团队知识库描述')
   creating.value = true
   try {
-    await wsApi.create({ name, description: createForm.value.description.trim() || undefined })
+    await wsApi.create({
+      name,
+      description: createForm.value.description.trim() || undefined,
+      kbName,
+      kbDescription,
+    })
     showCreate.value = false
-    createForm.value = { name: '', description: '' }
+    createForm.value = { name: '', description: '', kbName: '', kbDescription: '' }
     toast.success('已创建')
     await load()
   } catch {
@@ -109,6 +125,15 @@ onMounted(load)
           创建团队
         </button>
       </div>
+    </div>
+
+    <div class="mb-6 flex items-center gap-2">
+      <div class="relative max-w-sm flex-1">
+        <AppIcon name="search" :size="15" class="absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
+        <input v-model="keyword" class="input pl-9" placeholder="按团队名称搜索" @keydown.enter="load" />
+      </div>
+      <button class="btn-secondary" @click="load">搜索</button>
+      <button v-if="keyword" class="btn-secondary" @click="clearSearch">清空</button>
     </div>
 
     <div v-if="loading" class="flex justify-center py-16">
@@ -158,7 +183,15 @@ onMounted(load)
         </div>
         <div>
           <label class="label">描述（可选）</label>
-          <textarea v-model="createForm.description" class="input resize-none" rows="3" />
+          <textarea v-model="createForm.description" class="input resize-none" rows="2" />
+        </div>
+        <div>
+          <label class="label">团队知识库名称</label>
+          <input v-model="createForm.kbName" class="input" placeholder="例如：产品研发知识库" />
+        </div>
+        <div>
+          <label class="label">团队知识库描述</label>
+          <textarea v-model="createForm.kbDescription" class="input resize-none" rows="2" placeholder="简要说明知识库用途" />
         </div>
       </div>
       <div class="mt-5 flex justify-end gap-2">

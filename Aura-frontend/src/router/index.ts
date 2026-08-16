@@ -32,9 +32,9 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/admin/AdminLayout.vue'),
     meta: { admin: true },
     children: [
-      { path: '', redirect: '/admin/users' },
-      { path: 'users', name: 'admin-users', component: () => import('@/views/admin/AdminUserView.vue') },
+      { path: '', redirect: '/admin/workspaces' },
       { path: 'workspaces', name: 'admin-workspaces', component: () => import('@/views/admin/AdminWorkspaceView.vue') },
+      { path: 'admins', name: 'admin-admins', component: () => import('@/views/admin/AdminAccountView.vue') },
       { path: 'feedbacks', name: 'admin-feedbacks', component: () => import('@/views/admin/AdminFeedbackView.vue') },
       { path: 'reports', name: 'admin-reports', component: () => import('@/views/admin/AdminReportView.vue') },
     ],

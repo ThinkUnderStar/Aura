@@ -3,6 +3,15 @@ import { API_BASE, getToken, clearToken } from './config'
 import { toast } from '@/stores/toast'
 import { toSnakeCase, toCamelCase } from '@/utils/transform'
 
+// 401 有两种来源：
+// 1) 真正未登录（Sa-Token NotLoginException → 后端固定返回 msg「用户未登录」）→ 需清 token 跳登录；
+// 2) 后端把业务校验误抛成 AuthException（同样走 401，如「验证码错误」）→ 只应提示，不应踢下线。
+// 因此仅当消息是「未登录」特征时才登出，其余 401 只弹提示。
+function isAuthFailure(msg?: string | null): boolean {
+  if (!msg) return true
+  return /未登录|登录已失效|登录失效/.test(msg)
+}
+
 export const http: AxiosInstance = axios.create({
   baseURL: API_BASE,
   timeout: 30_000,
@@ -33,13 +42,17 @@ http.interceptors.response.use(
 
     if (body.code === 200) return response
     if (body.code === 401) {
-      clearToken()
-      toast.error(body.msg || '登录已失效，请重新登录')
-      // 避免在登录页反复跳转
-      if (!location.pathname.includes('/login')) {
-        setTimeout(() => (location.href = '/login'), 800)
+      if (isAuthFailure(body.msg)) {
+        clearToken()
+        toast.error(body.msg || '登录已失效，请重新登录')
+        // 避免在登录页反复跳转
+        if (!location.pathname.includes('/login')) {
+          setTimeout(() => (location.href = '/login'), 800)
+        }
+      } else {
+        toast.error(body.msg || '请求失败')
       }
-      return Promise.reject(new Error(body.msg))
+      return Promise.reject(new Error(body.msg || '请求失败'))
     }
     toast.error(body.msg || '请求失败')
     return Promise.reject(new Error(body.msg || '请求失败'))
@@ -47,7 +60,7 @@ http.interceptors.response.use(
   (error) => {
     const status = error.response?.status
     const msg = error.response?.data?.msg || (status === 401 ? '未登录' : '网络异常，请稍后重试')
-    if (status === 401) {
+    if (status === 401 && isAuthFailure(msg)) {
       clearToken()
       if (!location.pathname.includes('/login')) location.href = '/login'
     } else {

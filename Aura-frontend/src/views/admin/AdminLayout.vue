@@ -5,8 +5,8 @@ import AppIcon from '@/components/ui/AppIcon.vue'
 const router = useRouter()
 
 const tabs = [
-  { name: '用户', path: '/admin/users', icon: 'user' },
   { name: '团队', path: '/admin/workspaces', icon: 'users' },
+  { name: '管理员', path: '/admin/admins', icon: 'shield' },
   { name: '反馈', path: '/admin/feedbacks', icon: 'mail' },
   { name: '举报', path: '/admin/reports', icon: 'flag' },
 ]

@@ -14,7 +14,6 @@ import thinkunderstar.aura.aurabackendserver.dto.request.AiImageDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.PromptDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.UpdateUserDto;
 import thinkunderstar.aura.aurabackendserver.entity.User;
-import thinkunderstar.aura.aurabackendserver.exception.AuthException;
 import thinkunderstar.aura.aurabackendserver.exception.BusinessException;
 import thinkunderstar.aura.aurabackendserver.service.core.AuthService;
 import thinkunderstar.aura.aurabackendserver.service.core.SysUserService;
@@ -67,7 +66,7 @@ public class SysUserServiceImpl implements SysUserService {
     public Result<Void> update(UpdateUserDto updateUserDto) {
         //type只包括“username”，“password”，“phone”，“email”
         if (updateUserDto.getType() == null || updateUserDto.getType().isEmpty()) {
-            throw new AuthException("修改用户信息的类型参数有问题");
+            throw new BusinessException("修改用户信息的类型参数有问题");
         }
 
         boolean updateLimiter = redisTokenBucketLimiter.tryAcquireByUser(
@@ -77,7 +76,7 @@ public class SysUserServiceImpl implements SysUserService {
         );
 
         if (!updateLimiter) {
-            throw new AuthException("修改操作过于频繁，请稍后再试");
+            throw new BusinessException("修改操作过于频繁，请稍后再试");
         }
 
         switch (updateUserDto.getType()) {
@@ -117,7 +116,7 @@ public class SysUserServiceImpl implements SysUserService {
                 }
                 //修改账号绑定的邮箱地址
             }
-            default -> throw new AuthException("修改用户信息的类型参数有问题");
+            default -> throw new BusinessException("修改用户信息的类型参数有问题");
         }
     }
 
@@ -166,7 +165,7 @@ public class SysUserServiceImpl implements SysUserService {
 
         String avatar = "/avatars/"+loginId+"-"+System.currentTimeMillis()+"-aura."+ext;
         try {
-            file.transferTo(Path.of("./docs"+avatar).toFile());
+            file.transferTo(Path.of("./docs"+avatar).toAbsolutePath().toFile());
         } catch (IOException e) {
             log.error("用户:"+StpUtil.getLoginIdAsString()+"的头像文件上传失败");
             throw new BusinessException("头像文件上传失败");
@@ -276,11 +275,11 @@ public class SysUserServiceImpl implements SysUserService {
     //修改用户的昵称
     private boolean updateUsername(String username) {
         if (username == null) {
-            throw new AuthException("修改后的用户昵称不能为空");
+            throw new BusinessException("修改后的用户昵称不能为空");
         }
 
         if (!ValidateUtils.usernameValidate(username)) {
-            throw new AuthException("修改后的用户昵称不符合命名规范");
+            throw new BusinessException("修改后的用户昵称不符合命名规范");
         }
 
         long loginId = StpUtil.getLoginIdAsLong();
@@ -294,22 +293,22 @@ public class SysUserServiceImpl implements SysUserService {
     //修改用户的账户密码
     private boolean updatePassword(String password, String repeatPassword) {
         if (password == null) {
-            throw new AuthException("修改后的用户密码不能为空");
+            throw new BusinessException("修改后的用户密码不能为空");
         }
 
         if (!ValidateUtils.passwordValidate(password)) {
-            throw new AuthException("修改后的用户密码不符合要求");
+            throw new BusinessException("修改后的用户密码不符合要求");
         }
 
         if (!password.equals(repeatPassword)) {
-            throw new AuthException("第二次输入的密码与第一次不同");
+            throw new BusinessException("第二次输入的密码与第一次不同");
         }
 
         long loginId = StpUtil.getLoginIdAsLong();
         User user = userService.getById(loginId);
 
         if (BCrypt.checkpw(password, user.getPassword())) {
-            throw new AuthException("修改后的密码不能与原密码相同");
+            throw new BusinessException("修改后的密码不能与原密码相同");
         }
 
         user.setPassword(BCrypt.hashpw(password, BCrypt.gensalt(12)));
@@ -320,21 +319,21 @@ public class SysUserServiceImpl implements SysUserService {
     //换绑该账号的手机号
     private boolean updatePhone(String phone, String code) {
         if (phone == null) {
-            throw new AuthException("换绑的手机号为空");
+            throw new BusinessException("换绑的手机号为空");
         }
 
         if (!ValidateUtils.phoneValidate(phone)) {
-            throw new AuthException("换绑的手机号不合规");
+            throw new BusinessException("换绑的手机号不合规");
         }
 
         if (code == null || !code.equals(redisUtils.get(phone+":aura:codeExistLock:reset"))) {
-            throw new AuthException("验证码错误");
+            throw new BusinessException("验证码错误");
         }
 
         User one = userService.getOne(new LambdaQueryWrapper<User>().eq(User::getPhone, phone));
 
         if (one != null && one.getDeleted() != 1) {
-            throw new AuthException("该手机号已被其他账号绑定");
+            throw new BusinessException("该手机号已被其他账号绑定");
         }
 
         long loginId = StpUtil.getLoginIdAsLong();
@@ -351,20 +350,20 @@ public class SysUserServiceImpl implements SysUserService {
     //修改该账户绑定的邮箱地址
     private boolean updateEmail(String email, String code) {
         if (email == null) {
-            throw new AuthException("换绑的邮箱地址为空");
+            throw new BusinessException("换绑的邮箱地址为空");
         }
 
         if (!ValidateUtils.emailValidate((email))) {
-            throw new AuthException("换绑的邮箱地址不合规");
+            throw new BusinessException("换绑的邮箱地址不合规");
         }
 
         if (code == null || !code.equals(redisUtils.get(email+":aura:codeExistLock:reset"))) {
-            throw new AuthException("验证码错误");
+            throw new BusinessException("验证码错误");
         }
 
         User one = userService.getOne(new LambdaQueryWrapper<User>().eq(User::getEmail, email));
         if (one != null && one.getDeleted() != 1) {
-            throw new AuthException("该邮箱已被其他账户绑定");
+            throw new BusinessException("该邮箱已被其他账户绑定");
         }
 
         long loginId = StpUtil.getLoginIdAsLong();

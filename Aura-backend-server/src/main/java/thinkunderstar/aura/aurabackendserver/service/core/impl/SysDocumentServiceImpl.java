@@ -55,7 +55,6 @@ public class SysDocumentServiceImpl implements SysDocumentService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public Result<Document> uploadDocument(MultipartFile file, Long kbId) {
         if (file == null || kbId == null) {
             throw new BusinessException("上传文档业务接口的参数接收异常");
@@ -171,16 +170,19 @@ public class SysDocumentServiceImpl implements SysDocumentService {
         if (!directory.exists()) {
             boolean mkDirs = directory.mkdirs();
             if (!mkDirs) {
+                documentService.removeById(document.getId());
                 throw new BusinessException("创建知识库的对应仓库失败");
             }
         }
 
         File docFile = new File("./docs"+docDirectoryPath+"/"+newFileName);
         try {
-            file.transferTo(docFile);
+            file.transferTo(docFile.getAbsoluteFile());
         } catch (IOException e) {
+            documentService.removeById(document.getId());
             throw new BusinessException("文件上传失败");
         }
+        documentService.updateById(document);
 
         //调用python端的服务接口上传文档到知识库中
         Result result = webClient.post()
@@ -194,12 +196,22 @@ public class SysDocumentServiceImpl implements SysDocumentService {
                 .block();
 
         if (result == null || result.getCode() != 200) {
-            throw new BusinessException("文档上传失败");
+            String msg = result == null ? "Python 服务无响应" : result.getMsg();
+            documentService.removeById(document.getId());
+            if (docFile.exists()) {
+                docFile.delete();
+            }
+            throw new BusinessException("文档上传失败: " + msg);
         }
 
         //设置字段检索完成
         document.setStatus(1);
         documentService.updateById(document);
+
+        //更新知识库的文档总数
+        knowledgeBase.setDocCount(knowledgeBase.getDocCount() + 1);
+        knowledgeBaseService.updateById(knowledgeBase);
+
         return Result.success(document);
     }
 

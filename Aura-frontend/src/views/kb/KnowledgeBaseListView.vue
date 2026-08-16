@@ -34,7 +34,7 @@ async function load() {
   loading.value = true
   try {
     const { data } = await kbApi.list(1, 100)
-    kbs.value = data.code === 200 ? data.data.records : []
+    kbs.value = data.code === 200 ? data.data.records.filter((k) => k.status === 1) : []
   } catch {
     kbs.value = []
   } finally {
@@ -47,7 +47,7 @@ async function search() {
   try {
     const kw = keyword.value.trim()
     const { data } = kw ? await kbApi.search(kw, 1, 100) : await kbApi.list(1, 100)
-    kbs.value = data.code === 200 ? data.data.records : []
+    kbs.value = data.code === 200 ? data.data.records.filter((k) => k.status === 1) : []
   } catch {
     kbs.value = []
   } finally {
