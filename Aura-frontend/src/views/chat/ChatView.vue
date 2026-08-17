@@ -24,10 +24,9 @@ const currentAgentId = ref<number | null>(null)
 
 const loadingAgents = ref(false)
 const loadingMessages = ref(false)
-const streaming = ref(false)
-const streamingText = ref('')
-const pendingInterrupt = ref<InterruptPayload | null>(null)
-const awaitingInterrupt = ref(false)
+const streamingAgents = ref<Record<number, boolean>>({})
+const streamingByAgent = ref<Record<number, string>>({})
+const interruptByAgent = ref<Record<number, InterruptPayload>>({})
 const webSearch = ref(false)
 
 const scrollRef = ref<HTMLElement | null>(null)
@@ -40,10 +39,14 @@ const showBacktrackConfirm = ref(false)
 const backtrackConfirmMessage = ref('')
 const pendingBacktrack = ref<{ messageId: number; content: string } | null>(null)
 
-let abortController: AbortController | null = null
+// 每个智能体独立的流式连接，互不中断
+const abortControllers = new Map<number, AbortController>()
 
 const currentAgent = computed(() => agents.value.find((a) => a.id === currentAgentId.value))
-const hasMessages = computed(() => messages.value.length > 0 || streaming.value || !!streamingText.value)
+const currentStreaming = computed(() => currentAgentId.value != null && !!streamingAgents.value[currentAgentId.value])
+const currentStreamingText = computed(() => (currentAgentId.value != null ? streamingByAgent.value[currentAgentId.value] ?? '' : ''))
+const currentInterrupt = computed(() => (currentAgentId.value != null ? interruptByAgent.value[currentAgentId.value] ?? null : null))
+const hasMessages = computed(() => messages.value.length > 0 || currentStreaming.value || !!currentStreamingText.value || !!currentInterrupt.value)
 
 async function scrollToBottom() {
   await nextTick()
@@ -106,69 +109,77 @@ function selectAgent(agent: Agent) {
   router.push(`/chat/${agent.id}`)
 }
 
-function finalize() {
-  if (streamingText.value.trim()) {
-    messages.value.push({
-      id: -Date.now(),
-      agentId: currentAgentId.value ?? 0,
-      role: 'assistant',
-      content: streamingText.value,
-      createTime: new Date().toISOString(),
-      action: null,
-      editedContent: null,
-    })
+function finalize(agentId: number) {
+  const text = streamingByAgent.value[agentId] ?? ''
+  // 仅当收尾时正好在查看该智能体才落库；否则等切回来时由 loadMessages 拉取（后端此时已写入）
+  if (text.trim() && agentId === currentAgentId.value) {
+    // 快速切换时 loadMessages 可能已把后端写入的这条拉进列表，避免本地再 push 造成重复
+    const alreadyStored = messages.value.some(
+      (m) => m.agentId === agentId && m.role === 'assistant' && m.content === text,
+    )
+    if (!alreadyStored) {
+      messages.value.push({
+        id: -Date.now(),
+        agentId,
+        role: 'assistant',
+        content: text,
+        createTime: new Date().toISOString(),
+        action: null,
+        editedContent: null,
+      })
+    }
   }
-  streamingText.value = ''
-  streaming.value = false
-  awaitingInterrupt.value = false
+  delete streamingByAgent.value[agentId]
+  delete interruptByAgent.value[agentId]
+  delete streamingAgents.value[agentId]
+  abortControllers.delete(agentId)
   scrollToBottom()
 }
 
-function makeHandlers(): StreamHandlers {
+function makeHandlers(agentId: number): StreamHandlers {
   return {
     onText: (t) => {
-      streamingText.value += t
+      streamingByAgent.value[agentId] = (streamingByAgent.value[agentId] ?? '') + t
       scrollToBottom()
     },
     onInterrupt: (p) => {
-      awaitingInterrupt.value = true
-      pendingInterrupt.value = p
-      streaming.value = false
+      interruptByAgent.value[agentId] = p
       scrollToBottom()
     },
     onDone: () => {
-      if (!awaitingInterrupt.value) finalize()
+      if (!interruptByAgent.value[agentId]) finalize(agentId)
     },
     onError: (m) => {
       toast.error(m)
-      streaming.value = false
-      if (streamingText.value) finalize()
-      else awaitingInterrupt.value = false
+      finalize(agentId)
     },
   }
 }
 
 async function runStream(path: string, body: Record<string, unknown>, method: 'POST' | 'PUT' = 'POST') {
-  abortController = new AbortController()
-  streaming.value = true
-  await streamChat(path, body, makeHandlers(), abortController.signal, method)
+  const agentId = currentAgentId.value
+  if (agentId == null) return
+  const controller = new AbortController()
+  abortControllers.set(agentId, controller)
+  streamingAgents.value[agentId] = true
+  await streamChat(path, body, makeHandlers(agentId), controller.signal, method)
 }
 
 async function send(text: string) {
-  if (!currentAgentId.value || streaming.value) return
+  const agentId = currentAgentId.value
+  if (agentId == null || currentStreaming.value) return
+  delete interruptByAgent.value[agentId]
   messages.value.push({
     id: -Date.now(),
-    agentId: currentAgentId.value,
+    agentId,
     role: 'user',
     content: text,
     createTime: new Date().toISOString(),
     action: null,
     editedContent: null,
   })
-  streamingText.value = ''
-  awaitingInterrupt.value = false
   await scrollToBottom()
-  await runStream(`/chat/send/${currentAgentId.value}`, {
+  await runStream(`/chat/send/${agentId}`, {
     humanContent: text,
     enableWebSearch: webSearch.value ? 1 : 0,
   })
@@ -177,9 +188,8 @@ async function send(text: string) {
 // ---------- 中断续接 ----------
 async function onChoose(option: string, edition?: string) {
   const agentId = currentAgentId.value
-  pendingInterrupt.value = null
-  if (!agentId) return
-  awaitingInterrupt.value = false
+  if (agentId == null) return
+  delete interruptByAgent.value[agentId]
   await runStream(`/chat/tool_allow/${agentId}`, {
     choice: option,
     edition: option === 'edit' ? edition : '',
@@ -188,9 +198,10 @@ async function onChoose(option: string, edition?: string) {
 }
 
 function onCancelInterrupt() {
-  pendingInterrupt.value = null
-  awaitingInterrupt.value = false
-  if (streamingText.value) finalize()
+  const agentId = currentAgentId.value
+  if (agentId == null) return
+  delete interruptByAgent.value[agentId]
+  finalize(agentId)
 }
 
 // ---------- 清空对话 ----------
@@ -211,7 +222,7 @@ async function clearConversation() {
 
 // ---------- 回溯（编辑消息重新生成） ----------
 function onEditSubmit(message: MessageVO, newContent: string) {
-  if (streaming.value) return
+  if (currentStreaming.value) return
   const idx = messages.value.findIndex((m) => m.id === message.id)
   const subsequent = idx >= 0 ? messages.value.length - 1 - idx : 0
   if (subsequent > 0) {
@@ -231,14 +242,15 @@ function confirmBacktrack() {
 }
 
 async function doBacktrack(messageId: number, content: string) {
+  const agentId = currentAgentId.value
+  if (agentId == null) return
   const idx = messages.value.findIndex((m) => m.id === messageId)
   if (idx >= 0) {
     messages.value[idx].content = content
     messages.value.splice(idx + 1)
   }
-  streamingText.value = ''
-  awaitingInterrupt.value = false
-  pendingInterrupt.value = null
+  delete streamingByAgent.value[agentId]
+  delete interruptByAgent.value[agentId]
   await scrollToBottom()
   await runStream(
     `/chat/update/${messageId}`,
@@ -256,16 +268,15 @@ watch(
   (id) => {
     if (id) {
       currentAgentId.value = Number(id)
-      streamingText.value = ''
-      streaming.value = false
-      pendingInterrupt.value = null
-      awaitingInterrupt.value = false
+      // 流式状态按智能体隔离，切换不清空：若该智能体正在生成，切回来会继续显示并续写
       loadMessages()
     }
   },
 )
 
-onBeforeUnmount(() => abortController?.abort())
+onBeforeUnmount(() => {
+  for (const c of abortControllers.values()) c.abort()
+})
 
 // ---------- 初始化 ----------
 async function init() {
@@ -288,10 +299,17 @@ init()
       <button
         v-for="agent in agents"
         :key="agent.id"
-        class="shrink-0 rounded-sm px-3 py-1.5 text-sm transition-colors"
+        class="flex shrink-0 items-center gap-1.5 rounded-sm px-3 py-1.5 text-sm transition-colors"
         :class="agent.id === currentAgentId ? 'bg-ink font-medium text-white' : 'text-muted hover:bg-surface-muted hover:text-ink'"
         @click="selectAgent(agent)"
       >
+        <AppIcon
+          v-if="streamingAgents[agent.id]"
+          name="refresh"
+          :size="13"
+          class="animate-spin"
+          :class="agent.id === currentAgentId ? 'text-white' : 'text-muted'"
+        />
         {{ agent.name }}
       </button>
 
@@ -361,32 +379,32 @@ init()
           v-for="m in messages"
           :key="m.id"
           :message="m"
-          :disabled="streaming"
+          :disabled="currentStreaming"
           @edit-submit="onEditSubmit"
         />
 
-        <!-- 流式输出气泡（最新在底部） -->
-        <div v-if="streaming || streamingText" class="flex gap-3">
+        <!-- 流式输出气泡（仅当前智能体生成时显示；切回来可继续看到并续写） -->
+        <div v-if="currentStreaming || currentStreamingText" class="flex gap-3">
           <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink text-white">
             <span class="font-serif text-xs leading-none">A</span>
           </div>
           <div class="min-w-0 max-w-[80%]">
             <p class="text-xs text-faint">Aura</p>
             <div class="mt-1 rounded-lg rounded-tl-sm border border-line bg-surface px-4 py-3">
-              <Markdown v-if="streamingText" :content="streamingText" />
+              <Markdown v-if="currentStreamingText" :content="currentStreamingText" />
               <span v-else class="flex items-center gap-1 text-faint">
                 <AppIcon name="refresh" :size="13" class="animate-spin" />
                 思考中…
               </span>
-              <span v-if="streaming" class="inline-block h-4 w-1.5 animate-pulse bg-ink align-middle" />
+              <span v-if="currentStreaming" class="inline-block h-4 w-1.5 animate-pulse bg-ink align-middle" />
             </div>
           </div>
         </div>
 
-        <!-- 工具调用确认（内联） -->
+        <!-- 工具调用确认（内联，按智能体独立） -->
         <ToolConfirmPanel
-          v-if="pendingInterrupt"
-          :payload="pendingInterrupt"
+          v-if="currentInterrupt"
+          :payload="currentInterrupt"
           @choose="onChoose"
           @cancel="onCancelInterrupt"
         />
@@ -396,7 +414,7 @@ init()
     <!-- 输入区 -->
     <div class="shrink-0 border-t border-line bg-surface px-4 py-3">
       <div class="mx-auto max-w-3xl">
-        <ChatInput :disabled="!currentAgentId || streaming" @send="send" />
+        <ChatInput :disabled="!currentAgentId || currentStreaming" @send="send" />
         <div class="mt-2 flex justify-end">
           <span class="text-xs text-faint">Aura 可能出错，请核对重要信息</span>
         </div>

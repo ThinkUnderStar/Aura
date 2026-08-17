@@ -199,12 +199,6 @@ async function deleteWs() {
   router.push('/workspaces')
 }
 
-async function cleanWs() {
-  await wsApi.clean(wsId.value)
-  toast.success('团队已清空')
-  await loadMembers()
-}
-
 function onLogPage(p: number) {
   page.value = p
   loadLogs()
@@ -294,7 +288,8 @@ onMounted(() => {
             <AppIcon name="book" :size="17" class="text-muted" />
             <div class="flex-1">
               <p class="text-sm text-ink">{{ teamKb.name }}</p>
-              <p class="text-xs text-faint">{{ teamKb.docCount }} 篇文档</p>
+              <p class="mt-0.5 line-clamp-2 text-xs leading-5 text-faint">{{ teamKb.description || '暂无描述' }}</p>
+              <p class="mt-1 text-xs text-faint">{{ teamKb.docCount }} 篇文档</p>
             </div>
             <AppIcon name="chevron-right" :size="14" class="text-faint" />
           </button>
@@ -308,9 +303,6 @@ onMounted(() => {
               退出团队
             </button>
             <template v-if="isOwner">
-              <button class="btn-danger-soft" @click="ask('清空团队', '将移除全部成员及其数据，且不可恢复。确定清空吗？', cleanWs, true)">
-                清空团队
-              </button>
               <button class="btn-danger" @click="ask('解散团队', '解散后团队将不可访问，此操作不可撤销。确定解散吗？', deleteWs, true)">
                 解散团队
               </button>

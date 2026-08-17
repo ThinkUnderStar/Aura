@@ -55,6 +55,20 @@ public class SysKnowledgeBaseController {
     }
 
     /**
+     * 获取知识库详情
+     * 权限：需登录（@SaCheckLogin）
+     * 限流：基于令牌桶算法，限制访问频率
+     *
+     * @param knowledgeBaseId 知识库ID
+     * @return 知识库信息
+     */
+    @GetMapping("/get/{knowledgeBaseId}/details")
+    @SaCheckLogin
+    public Result<KnowledgeBase> getKnowledgeBase(@PathVariable Long knowledgeBaseId){
+        return  sysKnowledgeBaseService.getKnowledgeBase(knowledgeBaseId);
+    }
+
+    /**
      * 获取指定团队绑定的知识库详情
      * <p>
      * 根据团队ID查询该团队当前绑定的知识库完整信息。

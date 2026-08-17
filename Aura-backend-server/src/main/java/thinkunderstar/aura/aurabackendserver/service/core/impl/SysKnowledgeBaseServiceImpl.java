@@ -150,6 +150,72 @@ public class SysKnowledgeBaseServiceImpl implements SysKnowledgeBaseService {
     }
 
     @Override
+    public Result<KnowledgeBase> getKnowledgeBase(Long knowledgeBaseId) {
+        if (knowledgeBaseId == null) {
+            throw new BusinessException("获取指定知识库信息接口参数接收异常");
+        }
+
+        //限流
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (!redisTokenBucketLimiter.tryAcquireByUser(String.valueOf(loginId),10,2)){
+            throw new BusinessException("获取知识库信息过于频繁，请稍后再试");
+        }
+
+        //鉴权
+        KnowledgeBase knowledgeBase = knowledgeBaseService.getById(knowledgeBaseId);
+        User user = userService.getById(loginId);
+
+        if (user.getRole() != 2) {
+            if (knowledgeBase == null) {
+                throw new BusinessException("您无权查看该知识库的信息");
+            }
+
+            if (knowledgeBase.getIsTeam() != 1) {
+                //私人知识库鉴权
+                if ( knowledgeBase.getOwnerId() != loginId) {
+                    throw new BusinessException("您无权查看该知识库的信息");
+                }
+
+            }else {
+                //团队知识库鉴权
+                Workspace workspace = workspaceService.getOne(
+                        new LambdaQueryWrapper<Workspace>()
+                                .eq(Workspace::getKbId, knowledgeBaseId)
+                );
+
+                if (workspace == null) {
+                    throw new BusinessException("该团队不存在");
+                }
+
+                Long workspaceId = workspace.getId();
+                List<Long> memberIds = workspaceMemberMapper.selectList(
+                                new LambdaQueryWrapper<WorkspaceMember>()
+                                        .eq(WorkspaceMember::getWorkspaceId, workspaceId)
+                                        .eq(WorkspaceMember::getStatus,1)
+                                        .select(WorkspaceMember::getUserId)
+                        ).stream()
+                        .map(WorkspaceMember::getUserId)
+                        .collect(Collectors.toList());
+
+                if (!memberIds.contains(loginId)) {
+                    throw new BusinessException("您无权查看该知识库的信息");
+                }
+            }
+
+        } else {
+            if (knowledgeBase == null){
+                throw new BusinessException("该知识库不存在");
+            }
+        }
+
+        if (knowledgeBase.getStatus() != 1){
+            throw new BusinessException("该知识库已经停用");
+        }
+
+        return Result.success(knowledgeBase);
+    }
+
+    @Override
     public Result<KnowledgeBase> getTeamKnowledgeBases(Long workspaceId) {
         if (workspaceId == null || workspaceId < 1) {
             throw new BusinessException("获取指定团队知识库信息接口的参数接收异常");

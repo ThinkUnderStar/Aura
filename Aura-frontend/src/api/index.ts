@@ -72,7 +72,7 @@ export const kbApi = {
   list: (page = 1, pageSize = 20) =>
     http.get<Result<Page<KnowledgeBase>>>('/kb/get', { params: { page, pageSize } }),
   team: (workspaceId: number) => http.get<Result<KnowledgeBase>>(`/kb/get/${workspaceId}`),
-  detail: (kbId: number) => http.get<Result<KnowledgeBase>>(`/kb/detail/${kbId}`),
+  detail: (kbId: number) => http.get<Result<KnowledgeBase>>(`/kb/get/${kbId}/details`),
   updateMy: (data: { id: number; name?: string; description?: string }) =>
     http.put<Result<KnowledgeBase>>('/kb/update/my', data),
   updateTeam: (data: { id: number; type: 'name' | 'description'; value: string }) =>
