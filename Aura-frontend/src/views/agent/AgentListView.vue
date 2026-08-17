@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { agentApi, kbApi } from '@/api'
+import { agentApi, kbApi, wsApi } from '@/api'
 import { toast } from '@/stores/toast'
 import type { Agent, KnowledgeBase } from '@/types'
+
+/** 可绑定知识库：团队知识库额外携带其所属团队 id，用于还原已绑定状态 */
+type BindableKb = KnowledgeBase & { workspaceId?: number }
 import { formatTime, initialOf } from '@/utils/format'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppModal from '@/components/ui/AppModal.vue'
@@ -28,7 +31,7 @@ const deleting = ref<Agent | null>(null)
 const deletingBusy = ref(false)
 
 const binding = ref<Agent | null>(null)
-const personalKbs = ref<KnowledgeBase[]>([])
+const allKbs = ref<BindableKb[]>([])
 const boundIds = ref<number[]>([])
 const bindingBusy = ref(false)
 const bindingLoading = ref(false)
@@ -102,16 +105,51 @@ async function remove() {
 async function openBind(agent: Agent) {
   binding.value = agent
   boundIds.value = []
+  allKbs.value = []
   bindingLoading.value = true
   try {
-    const [kbs, bound] = await Promise.all([
+    const [kbs, bound, workspaces] = await Promise.all([
       kbApi.list(1, 100),
       agentApi.bindingKbs(agent.id),
+      wsApi.list(1, 100),
     ])
-    personalKbs.value = kbs.data.code === 200 ? kbs.data.data.records.filter((k) => k.isTeam === 0 && k.status === 1) : []
-    boundIds.value = bound.data.code === 200 ? bound.data.data.kbIds ?? [] : []
+
+    const list: BindableKb[] = []
+    // 个人知识库
+    const personal = kbs.data.code === 200
+      ? kbs.data.data.records.filter((k) => k.isTeam === 0 && k.status === 1)
+      : []
+    list.push(...personal)
+
+    // 团队知识库：遍历我所在的正常团队，逐个查询其绑定的知识库
+    // 后端接口会自动校验「团队正常 + 我是活跃成员 + 知识库正常」，无权/不可用则跳过
+    const team: BindableKb[] = []
+    if (workspaces.data.code === 200) {
+      for (const ws of workspaces.data.data.records) {
+        if (ws.status !== 1 || ws.memberStatus !== 1) continue
+        try {
+          const t = await kbApi.team(ws.id)
+          if (t.data.code === 200) team.push({ ...t.data.data, workspaceId: ws.id })
+        } catch {
+          /* 无权限或团队/知识库不可用，忽略该团队 */
+        }
+      }
+    }
+    list.push(...team)
+
+    allKbs.value = list
+
+    // 已绑定：个人 kbIds + 团队 workspaceIds 反查对应的知识库 id
+    const boundPersonalIds = bound.data.code === 200 ? (bound.data.data.kbIds ?? []) : []
+    const boundWorkspaceIds = new Set<number>(
+      bound.data.code === 200 ? (bound.data.data.workspaceIds ?? []) : [],
+    )
+    const boundTeamIds = team
+      .filter((k) => k.workspaceId != null && boundWorkspaceIds.has(k.workspaceId))
+      .map((k) => k.id)
+    boundIds.value = [...boundPersonalIds, ...boundTeamIds]
   } catch {
-    personalKbs.value = []
+    allKbs.value = []
   } finally {
     bindingLoading.value = false
   }
@@ -137,8 +175,8 @@ function toggleKb(id: number) {
   else boundIds.value.push(id)
 }
 
-const boundKbs = computed(() => personalKbs.value.filter((k) => boundIds.value.includes(k.id)))
-const availableKbs = computed(() => personalKbs.value.filter((k) => !boundIds.value.includes(k.id)))
+const boundKbs = computed(() => allKbs.value.filter((k) => boundIds.value.includes(k.id)))
+const availableKbs = computed(() => allKbs.value.filter((k) => !boundIds.value.includes(k.id)))
 
 onMounted(load)
 </script>
@@ -237,7 +275,7 @@ onMounted(load)
 
     <!-- 关联知识库 -->
     <AppModal :open="!!binding" title="关联知识库" width="max-w-lg" @close="binding = null">
-      <p class="text-sm text-faint">为「{{ binding?.name }}」勾选可用的个人知识库。</p>
+      <p class="text-sm text-faint">为「{{ binding?.name }}」勾选可用的个人或团队知识库。</p>
       <div v-if="bindingLoading" class="flex justify-center py-8">
         <AppSpinner />
       </div>
@@ -262,7 +300,13 @@ onMounted(load)
                   <AppIcon name="check" :size="11" />
                 </span>
                 <div class="min-w-0 flex-1">
-                  <p class="truncate text-sm text-ink">{{ kb.name }}</p>
+                  <p class="truncate text-sm text-ink">
+                    {{ kb.name }}
+                    <span
+                      v-if="kb.workspaceId != null"
+                      class="ml-1.5 rounded-sm bg-surface-muted px-1.5 py-0.5 text-[10px] text-faint"
+                    >团队</span>
+                  </p>
                   <p class="text-xs text-faint">{{ kb.docCount }} 篇文档</p>
                 </div>
                 <button
@@ -293,7 +337,13 @@ onMounted(load)
               >
                 <span class="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border border-line-strong"></span>
                 <div class="min-w-0 flex-1">
-                  <p class="truncate text-sm text-ink">{{ kb.name }}</p>
+                  <p class="truncate text-sm text-ink">
+                    {{ kb.name }}
+                    <span
+                      v-if="kb.workspaceId != null"
+                      class="ml-1.5 rounded-sm bg-surface-muted px-1.5 py-0.5 text-[10px] text-faint"
+                    >团队</span>
+                  </p>
                   <p class="text-xs text-faint">{{ kb.docCount }} 篇文档</p>
                 </div>
                 <button

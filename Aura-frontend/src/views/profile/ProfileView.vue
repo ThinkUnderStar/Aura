@@ -38,6 +38,19 @@ function syncForm() {
 }
 syncForm()
 
+const editing = ref(false)
+
+function startEdit() {
+  syncForm()
+  emailCode.value = ''
+  editing.value = true
+}
+
+function cancelEdit() {
+  editing.value = false
+  emailCode.value = ''
+}
+
 async function saveUsername() {
   const username = form.value.username.trim()
   if (!username) return toast.error('用户名不能为空')
@@ -185,8 +198,37 @@ async function deleteAccount() {
 
     <!-- 基本信息 -->
     <div class="card mb-4 p-5">
-      <h3 class="mb-4 text-sm font-medium text-ink">基本信息</h3>
-      <div class="space-y-4">
+      <div class="mb-4 flex items-center justify-between">
+        <h3 class="text-sm font-medium text-ink">基本信息</h3>
+        <button v-if="!editing" class="btn-secondary !px-3 !py-1.5 text-xs" @click="startEdit">
+          <AppIcon name="edit" :size="13" />
+          编辑资料
+        </button>
+        <button v-else class="btn-secondary !px-3 !py-1.5 text-xs" @click="cancelEdit">完成</button>
+      </div>
+
+      <!-- 只读展示 -->
+      <div v-if="!editing" class="space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-sm text-faint">用户名</span>
+          <span class="text-sm text-ink">{{ auth.user?.username || '—' }}</span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-sm text-faint">邮箱</span>
+          <span class="text-sm" :class="auth.user?.email ? 'text-ink' : 'text-faint'">
+            {{ auth.user?.email || '未绑定' }}
+          </span>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="text-sm text-faint">手机号</span>
+          <span class="text-sm" :class="auth.user?.phone ? 'text-ink' : 'text-faint'">
+            {{ auth.user?.phone || '未填写' }}
+          </span>
+        </div>
+      </div>
+
+      <!-- 编辑模式 -->
+      <div v-else class="space-y-4">
         <div>
           <label class="label">用户名</label>
           <div class="flex gap-2">

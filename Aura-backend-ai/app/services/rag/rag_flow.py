@@ -3,21 +3,14 @@ from typing import List
 from langchain_classic.retrievers import MultiQueryRetriever, ContextualCompressionRetriever
 from langchain_classic.retrievers.document_compressors import CrossEncoderReranker, LLMChainExtractor, \
     DocumentCompressorPipeline
-from langchain_community.document_compressors import LLMLinguaCompressor
-from langchain_community.vectorstores.milvus import Milvus
 from langchain_core.documents import Document
+from langchain_milvus import Milvus
 
 from app.core.config import settings
 from app.core.llm import multi_query_llm, reranker_llm, extractor_llm, embedding_llm
 from app.db.milvus.client import milvus_client
 
 #全局只加载一次
-# LLMLingua 压缩器
-lingua_compressor = LLMLinguaCompressor(
-    model_name=settings.LING_GUA_MODEL,
-    device_map="cuda"
-)
-
 # Reranker 压缩器
 reranker = CrossEncoderReranker(
     model=reranker_llm,
@@ -31,11 +24,9 @@ extractor = LLMChainExtractor.from_llm(llm=extractor_llm)
 pipline = DocumentCompressorPipeline(
     transformers=[
         reranker,  # 按相关性从大到小精排序
-        lingua_compressor,  # token 缩减
         extractor  # 摘要
     ]
 )
-
 
 async def rag_ask(question: str, collection_name: str) -> List[Document]:
     """

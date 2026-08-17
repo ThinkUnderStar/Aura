@@ -85,7 +85,7 @@ async def chat_with_agent_service(agent_id: int,chat_dto: ChatDto) -> AsyncGener
     )
  
     async for event in astream:
-        if event["event"] == "on_chat_model_stream":
+        if event["event"] == "on_chat_model_stream" and event["metadata"]["langgraph_node"] == "llm_node":
             content = event["data"]["chunk"].content
 
             if content != "":

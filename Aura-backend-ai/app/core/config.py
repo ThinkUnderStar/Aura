@@ -43,7 +43,6 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL: str = "qwen3-embedding:4b" #嵌入式模型
     MULTI_QUERY_MODEL: str = "llama3.2:3b" #多重查询模型
     RERANKER_MODEL: str = "BAAI/bge-reranker-v2-m3" #精排序模型
-    LING_GUA_MODEL: str = "microsoft/llmlingua-2-bert-base-multilingual-cased-meetingbank" #Token 缩减模型
     EXTRACTOR_MODEL: str = "qwen2.5:3b" #摘要模型
 
     #====================用户交互 LLM========================
