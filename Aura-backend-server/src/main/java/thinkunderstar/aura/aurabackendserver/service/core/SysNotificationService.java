@@ -46,9 +46,23 @@ public interface SysNotificationService {
     Result<Void> deleteNotification(Long notificationId);
 
     /**
+     * 一键清除所有已读通知（软删除，status=0）
+     *
+     * @return Result
+     */
+    Result<Void> deleteReadNotifications();
+
+    /**
      * 获取当前用户未读通知数量
      *
      * @return Result 未读数量
      */
     Result<Long> getUnreadCount();
+
+    /**
+     * 获取当前用户已读通知数量
+     *
+     * @return Result 已读数量
+     */
+    Result<Long> getReadCount();
 }

@@ -88,6 +88,19 @@ public class SysNotificationController {
     }
 
     /**
+     * 一键清除所有已读通知（软删除）
+     * <p>
+     * 将当前用户所有已读通知的 status 标记为 0（已删除）。
+     *
+     * @return Result
+     */
+    @DeleteMapping("/delete-read")
+    @SaCheckLogin
+    public Result<Void> deleteReadNotifications() {
+        return sysNotificationService.deleteReadNotifications();
+    }
+
+    /**
      * 获取未读通知数量
      * <p>
      * 返回当前登录用户的未读通知总数。
@@ -98,5 +111,18 @@ public class SysNotificationController {
     @SaCheckLogin
     public Result<Long> getUnreadCount() {
         return sysNotificationService.getUnreadCount();
+    }
+
+    /**
+     * 获取已读通知数量
+     * <p>
+     * 返回当前登录用户的已读通知总数。
+     *
+     * @return Result 已读数量
+     */
+    @GetMapping("/read-count")
+    @SaCheckLogin
+    public Result<Long> getReadCount() {
+        return sysNotificationService.getReadCount();
     }
 }

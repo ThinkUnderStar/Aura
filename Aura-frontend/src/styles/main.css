@@ -2,9 +2,55 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ============ 基础重置与全局基调 ============ */
+/* ============ 主题令牌（亮色 / 暗色） ============
+ * 设计系统唯一的色彩来源。Tailwind 的 canvas/surface/ink 等色都指向这些变量，
+ * 由 :root（亮色）与 html.dark（暗色）两套值供给；主题切换只需给 <html> 加/去 dark 类。
+ */
 :root {
+  --color-canvas: #f7f6f3;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f9f9f8;
+  --color-line: #eaeaea;
+  --color-line-strong: #d9d8d4;
+  --color-ink: #111111;
+  /* 品牌/按钮实底：亮色下与 ink 同色；暗色下保持深底白字 */
+  --color-ink-solid: #111111;
+  --color-muted: #787774;
+  --color-faint: #9b9a96;
+  --color-red-bg: #fdebec;
+  --color-red-text: #9f2f2d;
+  --color-red-solid: #9f2f2d;
+  --color-blue-bg: #e1f3fe;
+  --color-blue-text: #1f6c9f;
+  --color-green-bg: #edf3ec;
+  --color-green-text: #346538;
+  --color-yellow-bg: #fbf3db;
+  --color-yellow-text: #956400;
+  --color-code-bg: #f1f0ec;
   color-scheme: light;
+}
+
+html.dark {
+  --color-canvas: #1a1917;
+  --color-surface: #232220;
+  --color-surface-muted: #2b2a27;
+  --color-line: #33322e;
+  --color-line-strong: #45433e;
+  --color-ink: #eceae4;
+  --color-ink-solid: #151412;
+  --color-muted: #a6a39c;
+  --color-faint: #7e7b75;
+  --color-red-bg: #3b2a2c;
+  --color-red-text: #e3a0a3;
+  --color-red-solid: #8f2f2d;
+  --color-blue-bg: #1d2d38;
+  --color-blue-text: #7fb8da;
+  --color-green-bg: #22302a;
+  --color-green-text: #92c197;
+  --color-yellow-bg: #37321f;
+  --color-yellow-text: #d9b45c;
+  --color-code-bg: #2e2d2a;
+  color-scheme: dark;
 }
 
 html,
@@ -20,17 +66,17 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* 细滚动条（克制） */
+/* 细滚动条（克制），颜色随主题 */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #d9d8d4 transparent;
+  scrollbar-color: var(--color-line-strong) transparent;
 }
 *::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 *::-webkit-scrollbar-thumb {
-  background: #d9d8d4;
+  background: var(--color-line-strong);
   border-radius: 9999px;
 }
 *::-webkit-scrollbar-track {
@@ -49,7 +95,7 @@ body {
       transition-colors duration-150 select-none disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
-    @apply btn bg-ink text-white hover:bg-neutral-800 active:bg-black;
+    @apply btn bg-ink-solid text-white hover:bg-neutral-800 active:bg-black;
   }
   .btn-secondary {
     @apply btn border border-line bg-surface text-ink hover:bg-surface-muted;
@@ -58,7 +104,7 @@ body {
     @apply btn text-muted hover:bg-surface-muted hover:text-ink;
   }
   .btn-danger {
-    @apply btn bg-red-text text-white hover:opacity-90;
+    @apply btn bg-red-solid text-white hover:opacity-90;
   }
   .btn-danger-soft {
     @apply btn border border-line bg-surface text-red-text hover:bg-red-bg;

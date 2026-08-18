@@ -394,7 +394,8 @@ public class SysWorkspaceServiceImpl implements SysWorkspaceService {
 
         Workspace workspace = workspaceService.getById(workspaceId);
 
-        if (workspace == null || workspace.getStatus() != 1) {
+        // 放行正常(1)与封禁(2)的团队，仅已解散(0)的团队不允许重复解散
+        if (workspace == null || workspace.getStatus() == 0) {
             throw new BusinessException("未查询到该团队");
         }
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { memberApi, wsApi } from '@/api'
 import { toast } from '@/stores/toast'
@@ -10,6 +10,7 @@ import AppIcon from '@/components/ui/AppIcon.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppAvatar from '@/components/ui/AppAvatar.vue'
 import AppModal from '@/components/ui/AppModal.vue'
+import AppConfirm from '@/components/ui/AppConfirm.vue'
 import AppEmpty from '@/components/ui/AppEmpty.vue'
 import AppSpinner from '@/components/ui/AppSpinner.vue'
 
@@ -26,6 +27,10 @@ const creating = ref(false)
 const showJoin = ref(false)
 const inviteCode = ref('')
 const joining = ref(false)
+
+// 已解散/已封禁/被移出的团队：点卡片不进入详情，弹确认框决定是否清除记录
+const clearing = ref<WorkspaceVO | null>(null)
+const clearingBusy = ref(false)
 
 const ROLE_LABEL: Record<number, string> = {
   [MEMBER_ROLE.OWNER]: '创建者',
@@ -105,6 +110,79 @@ async function join() {
   }
 }
 
+/** 判断团队是否已处于“不可访问”状态（已解散/已封禁/被移出） */
+function isStaleTeam(ws: WorkspaceVO): boolean {
+  return ws.status === WS_STATUS.DISSOLVED || ws.status === WS_STATUS.BANNED || ws.memberStatus === 0
+}
+
+/** 不可访问状态对应的提示文案 */
+function stateHint(ws: WorkspaceVO): string {
+  if (ws.status === WS_STATUS.DISSOLVED) return '该团队已解散，无法访问。'
+  if (ws.status === WS_STATUS.BANNED) return '该团队已被封禁，暂时无法访问。'
+  if (ws.memberStatus === 0) return '你已被移出该团队。'
+  return ''
+}
+
+const clearMessage = computed(() => {
+  const ws = clearing.value
+  if (!ws) return ''
+  if (ws.status === WS_STATUS.BANNED) {
+    return ws.role === MEMBER_ROLE.OWNER
+      ? '该团队已被封禁，无法访问。解散后，该团队将停止存在并从所有成员的团队列表中消失。'
+      : '该团队已被封禁，无法访问。退出后，该团队将从你的团队列表中消失。'
+  }
+  return `${stateHint(ws)}\n清除后，该团队将从你的团队列表中消失。`
+})
+
+/** 清除按钮文案：封禁团队按身份区分（创建者→解散，成员→退出），其余→清除 */
+const clearConfirmText = computed(() => {
+  const ws = clearing.value
+  if (ws?.status === WS_STATUS.BANNED) return ws.role === MEMBER_ROLE.OWNER ? '解散' : '退出'
+  return '清除'
+})
+
+/** 封禁团队的解散属于破坏性操作，按钮标红提示 */
+const clearIsDanger = computed(() => {
+  const ws = clearing.value
+  return !!ws && ws.status === WS_STATUS.BANNED && ws.role === MEMBER_ROLE.OWNER
+})
+
+/** 点击团队卡片：正常团队进入详情，不可访问团队弹确认框 */
+function onCardClick(ws: WorkspaceVO) {
+  if (!isStaleTeam(ws)) {
+    router.push(`/workspaces/${ws.id}`)
+    return
+  }
+  clearing.value = ws
+}
+
+/** 确认清除：按团队状态调用对应后端接口 */
+async function confirmClear() {
+  const ws = clearing.value
+  if (!ws) return
+  clearingBusy.value = true
+  try {
+    if (ws.status === WS_STATUS.BANNED) {
+      if (ws.role === MEMBER_ROLE.OWNER) {
+        await wsApi.remove(ws.id) // 封禁团队：创建者解散
+        toast.success('已解散该团队')
+      } else {
+        await memberApi.quit(ws.id) // 封禁团队：成员退出
+        toast.success('已退出该团队')
+      }
+    } else {
+      await wsApi.clean(ws.id) // 已解散/被移出：清除成员记录
+      toast.success('已清除该团队的记录')
+    }
+    clearing.value = null
+    await load()
+  } catch {
+    /* 拦截器已提示 */
+  } finally {
+    clearingBusy.value = false
+  }
+}
+
 onMounted(load)
 </script>
 
@@ -129,7 +207,14 @@ onMounted(load)
 
     <div class="mb-6 flex items-center gap-2">
       <div class="relative max-w-sm flex-1">
-        <AppIcon name="search" :size="15" class="absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
+        <button
+          type="button"
+          class="absolute left-1 top-1/2 -translate-y-1/2 rounded-sm p-1 text-faint transition-colors hover:text-ink"
+          title="按团队名称搜索"
+          @click="load"
+        >
+          <AppIcon name="search" :size="15" />
+        </button>
         <input v-model="keyword" class="input pl-9" placeholder="按团队名称搜索" @keydown.enter="load" />
       </div>
       <button class="btn-secondary" @click="load">搜索</button>
@@ -157,7 +242,7 @@ onMounted(load)
         v-for="ws in workspaces"
         :key="ws.id"
         class="card group p-5 text-left transition-all hover:shadow-lift"
-        @click="router.push(`/workspaces/${ws.id}`)"
+        @click="onCardClick(ws)"
       >
         <div class="flex items-start justify-between">
           <AppAvatar :src="ws.logo" :name="ws.name" :size="40" />
@@ -212,5 +297,17 @@ onMounted(load)
         <button class="btn-primary" :disabled="joining" @click="join">加入</button>
       </div>
     </AppModal>
+
+    <!-- 清除不可访问团队的记录 -->
+    <AppConfirm
+      :open="!!clearing"
+      :title="clearing?.name || '团队'"
+      :message="clearMessage"
+      :confirm-text="clearConfirmText"
+      :danger="clearIsDanger"
+      :loading="clearingBusy"
+      @confirm="confirmClear"
+      @cancel="clearing = null"
+    />
   </div>
 </template>

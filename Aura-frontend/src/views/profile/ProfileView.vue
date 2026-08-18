@@ -5,6 +5,7 @@ import { authApi, userApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { toast } from '@/stores/toast'
 import { assetUrl } from '@/utils/asset'
+import { desensitizeEmail } from '@/utils/format'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppAvatar from '@/components/ui/AppAvatar.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
@@ -89,7 +90,8 @@ async function saveEmail() {
   try {
     await userApi.updateEmail(email, code)
     toast.success('邮箱已绑定')
-    auth.updateUser({ email })
+    // 后端不回传数据，本地按后端脱敏规则存储，避免明文覆盖
+    auth.updateUser({ email: desensitizeEmail(email) })
     emailCode.value = ''
   } catch {
     /* 拦截器已提示 */

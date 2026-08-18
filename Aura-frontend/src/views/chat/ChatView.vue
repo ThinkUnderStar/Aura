@@ -1,8 +1,12 @@
 <script setup lang="ts">
+defineOptions({ name: 'ChatView' })
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { agentApi, chatApi } from '@/api'
-import { streamChat, type InterruptPayload, type StreamHandlers } from '@/api/sse'
+import type { InterruptPayload, StreamHandlers } from '@/api/sse'
+import { useChatStreamStore } from '@/stores/chatStream'
+import { useChatUIStore } from '@/stores/chatUI'
 import { toast } from '@/stores/toast'
 import type { Agent, MessageVO } from '@/types'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
@@ -22,12 +26,28 @@ const agents = ref<Agent[]>([])
 const messages = ref<MessageVO[]>([])
 const currentAgentId = ref<number | null>(null)
 
+// 流式状态上提到 chatStream store：切模块（含 /admin）不再卸载即断流
+const chatStream = useChatStreamStore()
+const { streamingAgents, streamingByAgent, interruptByAgent } = storeToRefs(chatStream)
+
 const loadingAgents = ref(false)
 const loadingMessages = ref(false)
-const streamingAgents = ref<Record<number, boolean>>({})
-const streamingByAgent = ref<Record<number, string>>({})
-const interruptByAgent = ref<Record<number, InterruptPayload>>({})
-const webSearch = ref(false)
+
+// 联网开关 / 输入草稿按智能体独立（会话内有效），不共用一个状态
+const chatUI = useChatUIStore()
+const { webSearchByAgent, drafts } = storeToRefs(chatUI)
+const currentWebSearch = computed(() => currentAgentId.value != null && !!webSearchByAgent.value[currentAgentId.value])
+const draft = computed({
+  get: () => (currentAgentId.value != null ? drafts.value[currentAgentId.value] ?? '' : ''),
+  set: (text: string) => {
+    if (currentAgentId.value != null) drafts.value[currentAgentId.value] = text
+  },
+})
+
+function toggleWebSearch() {
+  if (currentAgentId.value == null) return
+  chatUI.toggleWebSearch(currentAgentId.value)
+}
 
 const scrollRef = ref<HTMLElement | null>(null)
 const showCreate = ref(false)
@@ -38,9 +58,6 @@ const clearing = ref(false)
 const showBacktrackConfirm = ref(false)
 const backtrackConfirmMessage = ref('')
 const pendingBacktrack = ref<{ messageId: number; content: string } | null>(null)
-
-// 每个智能体独立的流式连接，互不中断
-const abortControllers = new Map<number, AbortController>()
 
 const currentAgent = computed(() => agents.value.find((a) => a.id === currentAgentId.value))
 const currentStreaming = computed(() => currentAgentId.value != null && !!streamingAgents.value[currentAgentId.value])
@@ -109,9 +126,11 @@ function selectAgent(agent: Agent) {
   router.push(`/chat/${agent.id}`)
 }
 
-function finalize(agentId: number) {
+// 组件存活的期间，流收尾时把完整文本落库到当前视图的消息列表。
+// 组件卸载后（切到别的模块）store 里没有钩子，等切回来由 loadMessages 从后端拉取。
+chatStream.setFinalizeHook((agentId) => {
   const text = streamingByAgent.value[agentId] ?? ''
-  // 仅当收尾时正好在查看该智能体才落库；否则等切回来时由 loadMessages 拉取（后端此时已写入）
+  // 仅当收尾时正好在查看该智能体才落库
   if (text.trim() && agentId === currentAgentId.value) {
     // 快速切换时 loadMessages 可能已把后端写入的这条拉进列表，避免本地再 push 造成重复
     const alreadyStored = messages.value.some(
@@ -129,29 +148,25 @@ function finalize(agentId: number) {
       })
     }
   }
-  delete streamingByAgent.value[agentId]
-  delete interruptByAgent.value[agentId]
-  delete streamingAgents.value[agentId]
-  abortControllers.delete(agentId)
   scrollToBottom()
-}
+})
 
 function makeHandlers(agentId: number): StreamHandlers {
   return {
     onText: (t) => {
-      streamingByAgent.value[agentId] = (streamingByAgent.value[agentId] ?? '') + t
+      chatStream.appendText(agentId, t)
       scrollToBottom()
     },
     onInterrupt: (p) => {
-      interruptByAgent.value[agentId] = p
+      chatStream.setInterrupt(agentId, p)
       scrollToBottom()
     },
     onDone: () => {
-      if (!interruptByAgent.value[agentId]) finalize(agentId)
+      if (!interruptByAgent.value[agentId]) chatStream.finalize(agentId)
     },
     onError: (m) => {
       toast.error(m)
-      finalize(agentId)
+      chatStream.finalize(agentId)
     },
   }
 }
@@ -159,10 +174,7 @@ function makeHandlers(agentId: number): StreamHandlers {
 async function runStream(path: string, body: Record<string, unknown>, method: 'POST' | 'PUT' = 'POST') {
   const agentId = currentAgentId.value
   if (agentId == null) return
-  const controller = new AbortController()
-  abortControllers.set(agentId, controller)
-  streamingAgents.value[agentId] = true
-  await streamChat(path, body, makeHandlers(agentId), controller.signal, method)
+  await chatStream.runStream(agentId, path, body, makeHandlers(agentId), method)
 }
 
 async function send(text: string) {
@@ -181,7 +193,7 @@ async function send(text: string) {
   await scrollToBottom()
   await runStream(`/chat/send/${agentId}`, {
     humanContent: text,
-    enableWebSearch: webSearch.value ? 1 : 0,
+    enableWebSearch: currentWebSearch.value ? 1 : 0,
   })
 }
 
@@ -193,7 +205,7 @@ async function onChoose(option: string, edition?: string) {
   await runStream(`/chat/tool_allow/${agentId}`, {
     choice: option,
     edition: option === 'edit' ? edition : '',
-    enableWebSearch: webSearch.value ? 1 : 0,
+    enableWebSearch: currentWebSearch.value ? 1 : 0,
   })
 }
 
@@ -201,7 +213,7 @@ function onCancelInterrupt() {
   const agentId = currentAgentId.value
   if (agentId == null) return
   delete interruptByAgent.value[agentId]
-  finalize(agentId)
+  chatStream.finalize(agentId)
 }
 
 // ---------- 清空对话 ----------
@@ -249,14 +261,13 @@ async function doBacktrack(messageId: number, content: string) {
     messages.value[idx].content = content
     messages.value.splice(idx + 1)
   }
-  delete streamingByAgent.value[agentId]
-  delete interruptByAgent.value[agentId]
+  chatStream.resetAgent(agentId)
   await scrollToBottom()
   await runStream(
     `/chat/update/${messageId}`,
     {
       humanContent: content,
-      enableWebSearch: webSearch.value ? 1 : 0,
+      enableWebSearch: currentWebSearch.value ? 1 : 0,
     },
     'PUT',
   )
@@ -275,7 +286,9 @@ watch(
 )
 
 onBeforeUnmount(() => {
-  for (const c of abortControllers.values()) c.abort()
+  // 组件卸载不中断后台流（切模块/跨 layout 时流继续跑）；只摘掉本视图的收尾钩子。
+  // 登出时由 chatStream store 统一 abort。
+  chatStream.setFinalizeHook(null)
 })
 
 // ---------- 初始化 ----------
@@ -300,7 +313,7 @@ init()
         v-for="agent in agents"
         :key="agent.id"
         class="flex shrink-0 items-center gap-1.5 rounded-sm px-3 py-1.5 text-sm transition-colors"
-        :class="agent.id === currentAgentId ? 'bg-ink font-medium text-white' : 'text-muted hover:bg-surface-muted hover:text-ink'"
+        :class="agent.id === currentAgentId ? 'bg-ink-solid font-medium text-white' : 'text-muted hover:bg-surface-muted hover:text-ink'"
         @click="selectAgent(agent)"
       >
         <AppIcon
@@ -324,9 +337,9 @@ init()
       <div class="ml-auto flex shrink-0 items-center gap-1">
         <button
           class="flex items-center gap-1.5 rounded-sm px-2.5 py-1.5 text-xs transition-colors"
-          :class="webSearch ? 'bg-blue-bg text-blue-text' : 'text-muted hover:bg-surface-muted hover:text-ink'"
-          title="联网搜索"
-          @click="webSearch = !webSearch"
+          :class="currentWebSearch ? 'bg-blue-bg text-blue-text' : 'text-muted hover:bg-surface-muted hover:text-ink'"
+          title="联网搜索（按智能体独立，本次会话内有效）"
+          @click="toggleWebSearch"
         >
           <AppIcon name="globe" :size="15" />
           联网
@@ -364,7 +377,7 @@ init()
 
       <!-- 空对话 -->
       <div v-else-if="!hasMessages" class="mx-auto max-w-2xl py-20 text-center">
-        <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-md bg-ink text-white">
+        <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-md bg-ink-solid text-white">
           <span class="font-serif text-lg leading-none">A</span>
         </div>
         <h2 class="font-serif text-lg text-ink">与 {{ currentAgent?.name }} 对话</h2>
@@ -385,7 +398,7 @@ init()
 
         <!-- 流式输出气泡（仅当前智能体生成时显示；切回来可继续看到并续写） -->
         <div v-if="currentStreaming || currentStreamingText" class="flex gap-3">
-          <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink text-white">
+          <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink-solid text-white">
             <span class="font-serif text-xs leading-none">A</span>
           </div>
           <div class="min-w-0 max-w-[80%]">
@@ -396,7 +409,7 @@ init()
                 <AppIcon name="refresh" :size="13" class="animate-spin" />
                 思考中…
               </span>
-              <span v-if="currentStreaming" class="inline-block h-4 w-1.5 animate-pulse bg-ink align-middle" />
+              <span v-if="currentStreaming" class="inline-block h-4 w-1.5 animate-pulse bg-ink-solid align-middle" />
             </div>
           </div>
         </div>
@@ -414,7 +427,7 @@ init()
     <!-- 输入区 -->
     <div class="shrink-0 border-t border-line bg-surface px-4 py-3">
       <div class="mx-auto max-w-3xl">
-        <ChatInput :disabled="!currentAgentId || currentStreaming" @send="send" />
+        <ChatInput v-model="draft" :disabled="!currentAgentId || currentStreaming" @send="send" />
         <div class="mt-2 flex justify-end">
           <span class="text-xs text-faint">Aura 可能出错，请核对重要信息</span>
         </div>

@@ -94,7 +94,7 @@ function cancelEdit() {
             v-for="o in options"
             :key="o"
             class="btn-secondary !px-3 !py-1.5 text-xs"
-            :class="{ '!bg-ink !text-white hover:!bg-neutral-800': o === 'approve' || o === 'continue' }"
+            :class="{ '!bg-ink-solid !text-white hover:!bg-neutral-800': o === 'approve' || o === 'continue' }"
             @click="choose(o)"
           >
             <AppIcon :name="o === 'reject' ? 'x' : 'check'" :size="13" />

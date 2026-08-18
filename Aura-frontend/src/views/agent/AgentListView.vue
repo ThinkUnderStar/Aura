@@ -296,7 +296,7 @@ onMounted(load)
                 :key="kb.id"
                 class="flex items-center gap-3 rounded-sm bg-surface-muted px-3 py-2.5"
               >
-                <span class="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm bg-ink text-canvas">
+                <span class="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm bg-ink-solid text-white">
                   <AppIcon name="check" :size="11" />
                 </span>
                 <div class="min-w-0 flex-1">

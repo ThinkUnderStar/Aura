@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import thinkunderstar.aura.aurabackendserver.common.Result;
@@ -21,6 +22,8 @@ import thinkunderstar.aura.aurabackendserver.util.RedisTokenBucketLimiter;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -245,5 +248,38 @@ public class SysReportServiceImpl implements SysReportService {
         }
 
         return Result.success(report);
+    }
+
+    /**
+     * 定时清除已处理/已驳回、且对应通知已被用户删除（不再与通知关联）的举报记录
+     */
+    @Scheduled(cron = "0 0 4 * * ?")
+    public void cleanHandledReports() {
+        log.info("开始执行定时清除已处理举报任务...");
+        try {
+            // 仍被有效通知（用户未删除）引用的举报ID，这些举报不能清除
+            List<Long> referencedIds = notificationService.list(
+                            new LambdaQueryWrapper<Notification>()
+                                    .select(Notification::getRelatedId)
+                                    .eq(Notification::getType, "report_result")
+                                    .eq(Notification::getStatus, 1)
+                    ).stream()
+                    .map(Notification::getRelatedId)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            // 已处理(1)/已驳回(2)，且不再被任何有效通知引用的举报 -> 物理删除
+            LambdaQueryWrapper<Report> wrapper = new LambdaQueryWrapper<Report>()
+                    .in(Report::getStatus, 1, 2);
+            if (!referencedIds.isEmpty()) {
+                wrapper.notIn(Report::getId, referencedIds);
+            }
+            reportService.remove(wrapper);
+
+            log.info("定时清除已处理举报任务完成");
+        } catch (Exception e) {
+            log.error("定时清除已处理举报任务失败", e);
+        }
     }
 }

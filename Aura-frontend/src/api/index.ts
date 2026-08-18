@@ -67,13 +67,13 @@ export const chatApi = {
 
 // ============ 知识库 ============
 export const kbApi = {
-  create: (data: { name: string; description?: string; isTeam?: number }) =>
+  create: (data: { name: string; description: string; isTeam?: number }) =>
     http.post<Result<KnowledgeBase>>('/kb/create', data),
   list: (page = 1, pageSize = 20) =>
     http.get<Result<Page<KnowledgeBase>>>('/kb/get', { params: { page, pageSize } }),
   team: (workspaceId: number) => http.get<Result<KnowledgeBase>>(`/kb/get/${workspaceId}`),
   detail: (kbId: number) => http.get<Result<KnowledgeBase>>(`/kb/get/${kbId}/details`),
-  updateMy: (data: { id: number; name?: string; description?: string }) =>
+  updateMy: (data: { id: number; name: string; description: string }) =>
     http.put<Result<KnowledgeBase>>('/kb/update/my', data),
   updateTeam: (data: { id: number; type: 'name' | 'description'; value: string }) =>
     http.put<Result<KnowledgeBase>>('/kb/update/team', data),
@@ -126,7 +126,7 @@ export const memberApi = {
   quit: (workspaceId: number) => http.delete<Result<void>>('/member/quit', { params: { workspaceId } }),
   remove: (workspaceId: number, userId: number) =>
     http.delete<Result<void>>('/member/remove', { params: { workspaceId, userId } }),
-  setRole: (data: { workspaceId: number; targetUserId: number; type: 'set_admin' | 'remove_admin' }) =>
+  setRole: (data: { workspaceId: number; memberId: number; setRole: 1 | 2 }) =>
     http.put<Result<WorkspaceMemberVO>>('/member/set-role', data),
   transferOwner: (workspaceId: number, targetUserId: number) =>
     http.put<Result<WorkspaceMemberVO>>('/member/owner/transfer', null, { params: { workspaceId, targetUserId } }),
@@ -139,7 +139,9 @@ export const notificationApi = {
   read: (notificationId: number) => http.put<Result<void>>('/notification/read', null, { params: { notificationId } }),
   readAll: () => http.put<Result<void>>('/notification/read-all'),
   remove: (notificationId: number) => http.delete<Result<void>>('/notification/delete', { params: { notificationId } }),
+  removeRead: () => http.delete<Result<void>>('/notification/delete-read'),
   unreadCount: () => http.get<Result<number>>('/notification/unread-count'),
+  readCount: () => http.get<Result<number>>('/notification/read-count'),
 }
 
 // ============ 反馈 ============

@@ -4,24 +4,28 @@ export default {
   theme: {
     extend: {
       colors: {
-        // 暖色单色系（设计系统唯一色彩来源）
-        canvas: '#F7F6F3',
-        surface: '#FFFFFF',
-        'surface-muted': '#F9F9F8',
-        line: '#EAEAEA',
-        'line-strong': '#D9D8D4',
-        ink: '#111111',
-        muted: '#787774',
-        faint: '#9B9A96',
+        // 暖色单色系（设计系统唯一色彩来源）。全部指向 CSS 变量，
+        // 由 main.css 的 :root（亮色）与 html.dark（暗色）统一供给。
+        canvas: 'var(--color-canvas)',
+        surface: 'var(--color-surface)',
+        'surface-muted': 'var(--color-surface-muted)',
+        line: 'var(--color-line)',
+        'line-strong': 'var(--color-line-strong)',
+        // ink 是正文色（暗色下变亮）；ink-solid 是品牌/按钮的实底色，暗色下保持深底白字
+        ink: 'var(--color-ink)',
+        'ink-solid': 'var(--color-ink-solid)',
+        muted: 'var(--color-muted)',
+        faint: 'var(--color-faint)',
         // 灰调柔色（状态语义）
-        'red-bg': '#FDEBEC',
-        'red-text': '#9F2F2D',
-        'blue-bg': '#E1F3FE',
-        'blue-text': '#1F6C9F',
-        'green-bg': '#EDF3EC',
-        'green-text': '#346538',
-        'yellow-bg': '#FBF3DB',
-        'yellow-text': '#956400',
+        'red-bg': 'var(--color-red-bg)',
+        'red-text': 'var(--color-red-text)',
+        'red-solid': 'var(--color-red-solid)',
+        'blue-bg': 'var(--color-blue-bg)',
+        'blue-text': 'var(--color-blue-text)',
+        'green-bg': 'var(--color-green-bg)',
+        'green-text': 'var(--color-green-text)',
+        'yellow-bg': 'var(--color-yellow-bg)',
+        'yellow-text': 'var(--color-yellow-text)',
       },
       fontFamily: {
         sans: [

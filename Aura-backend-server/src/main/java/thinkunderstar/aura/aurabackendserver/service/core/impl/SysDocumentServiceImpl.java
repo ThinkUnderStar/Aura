@@ -354,6 +354,12 @@ public class SysDocumentServiceImpl implements SysDocumentService {
             throw new BusinessException("从知识库中删除该文档失败");
         }
 
+        //更新知识库的文档总数（仅当文档已成功索引时才减一）
+        if (document.getStatus() == 1) {
+            knowledgeBase.setDocCount(knowledgeBase.getDocCount() - 1);
+            knowledgeBaseService.updateById(knowledgeBase);
+        }
+
         return Result.success();
     }
 
@@ -407,7 +413,13 @@ public class SysDocumentServiceImpl implements SysDocumentService {
             throw new BusinessException("未查询到该知识库");
         }
 
-        if (knowledgeBase.getIsTeam() == 0){ 
+        //管理员跳过该检查逻辑
+        User user = userService.getById(loginId);
+        if (user.getRole() == 2) {
+            return;
+        }
+
+        if (knowledgeBase.getIsTeam() == 0){
             if (loginId != knowledgeBase.getOwnerId()){
                 throw new BusinessException("你无权获取该知识库中的相关文件信息");
             }

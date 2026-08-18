@@ -77,7 +77,7 @@ function copy() {
   <div v-if="isUser" class="group flex justify-end gap-3">
     <div class="flex max-w-[80%] flex-col items-end">
       <!-- 编辑态 -->
-      <div v-if="editing" class="rounded-lg rounded-tr-sm bg-ink px-3 py-2.5">
+      <div v-if="editing" class="rounded-lg rounded-tr-sm bg-ink-solid px-3 py-2.5">
         <textarea
           v-model="draft"
           rows="3"
@@ -92,7 +92,7 @@ function copy() {
             取消
           </button>
           <button
-            class="rounded-sm bg-white px-2.5 py-1 text-xs font-medium text-ink transition-colors hover:bg-white/90 disabled:opacity-50"
+            class="rounded-sm bg-white px-2.5 py-1 text-xs font-medium text-ink-solid transition-colors hover:bg-white/90 disabled:opacity-50"
             :disabled="!draft.trim()"
             @click="submitEdit"
           >
@@ -101,7 +101,7 @@ function copy() {
         </div>
       </div>
       <!-- 普通态 -->
-      <div v-else class="rounded-lg rounded-tr-sm bg-ink px-4 py-2.5 text-sm leading-6 text-white">
+      <div v-else class="rounded-lg rounded-tr-sm bg-ink-solid px-4 py-2.5 text-sm leading-6 text-white">
         <span class="whitespace-pre-wrap break-words">{{ message.content }}</span>
       </div>
       <div class="mt-1 flex items-center gap-2 text-xs text-faint">
@@ -144,7 +144,7 @@ function copy() {
 
   <!-- 助手消息：左对齐，Markdown 渲染 -->
   <div v-else class="group flex gap-3">
-    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink text-white">
+    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink-solid text-white">
       <span class="font-serif text-xs leading-none">A</span>
     </div>
     <div class="min-w-0 max-w-[80%]">

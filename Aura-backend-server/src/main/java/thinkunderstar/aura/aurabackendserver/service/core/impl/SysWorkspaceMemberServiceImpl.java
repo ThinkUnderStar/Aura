@@ -213,7 +213,8 @@ public class SysWorkspaceMemberServiceImpl implements SysWorkspaceMemberService 
         }
 
         Workspace workspace = workspaceService.getById(workspaceId);
-        if (workspace == null || workspace.getStatus() != 1) {
+        // 放行正常(1)与封禁(2)的团队，已解散(0)的团队走清除记录接口
+        if (workspace == null || workspace.getStatus() == 0) {
             throw new BusinessException("未查询到该团队");
         }
 

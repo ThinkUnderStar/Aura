@@ -15,6 +15,7 @@ import AppConfirm from '@/components/ui/AppConfirm.vue'
 import AppEmpty from '@/components/ui/AppEmpty.vue'
 import AppSpinner from '@/components/ui/AppSpinner.vue'
 import AppPagination from '@/components/ui/AppPagination.vue'
+import ReportModal from '@/components/report/ReportModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -35,6 +36,7 @@ const showEdit = ref(false)
 const editForm = ref({ name: '', description: '' })
 const saving = ref(false)
 const logoInput = ref<HTMLInputElement | null>(null)
+const showReport = ref(false)
 
 const confirm = ref<null | { title: string; message: string; danger?: boolean; action: () => Promise<void> }>(null)
 const confirmBusy = ref(false)
@@ -100,7 +102,15 @@ async function loadLogs() {
 
 function switchTab(t: 'overview' | 'members' | 'logs') {
   tab.value = t
-  if (t === 'logs') loadLogs()
+  // 每次切标签都重新拉取对应数据，避免成员信息/团队信息更新后界面停留在旧数据
+  if (t === 'overview') {
+    loadWorkspace()
+    loadTeamKb()
+  } else if (t === 'members') {
+    loadMembers()
+  } else if (t === 'logs') {
+    loadLogs()
+  }
 }
 
 function ask(title: string, message: string, action: () => Promise<void>, danger = false) {
@@ -175,7 +185,8 @@ async function removeMember(m: WorkspaceMemberVO) {
 }
 
 async function setAdmin(m: WorkspaceMemberVO, set: boolean) {
-  await memberApi.setRole({ workspaceId: wsId.value, targetUserId: m.userId, type: set ? 'set_admin' : 'remove_admin' })
+  // 后端 SetRoleDto 用整数 setRole（1=设管理员，2=取消管理员）+ memberId
+  await memberApi.setRole({ workspaceId: wsId.value, memberId: m.userId, setRole: set ? 1 : 2 })
   toast.success(set ? '已设为管理员' : '已取消管理员')
   await loadMembers()
 }
@@ -233,16 +244,22 @@ onMounted(() => {
             <p class="mt-0.5 text-sm text-faint">{{ workspace.description || '暂无描述' }}</p>
           </div>
         </div>
-        <div v-if="isOwner || isAdmin" class="flex gap-2">
-          <button class="btn-secondary" @click="showEdit = true">
-            <AppIcon name="edit" :size="15" />
-            编辑
+        <div class="flex gap-2">
+          <button class="btn-ghost" @click="showReport = true">
+            <AppIcon name="flag" :size="15" />
+            举报
           </button>
-          <button class="btn-secondary" @click="logoInput?.click()">
-            <AppIcon name="upload" :size="15" />
-            上传 Logo
-          </button>
-          <input ref="logoInput" type="file" accept="image/*" class="hidden" @change="onLogo" />
+          <template v-if="isOwner || isAdmin">
+            <button class="btn-secondary" @click="showEdit = true">
+              <AppIcon name="edit" :size="15" />
+              编辑
+            </button>
+            <button class="btn-secondary" @click="logoInput?.click()">
+              <AppIcon name="upload" :size="15" />
+              上传 Logo
+            </button>
+            <input ref="logoInput" type="file" accept="image/*" class="hidden" @change="onLogo" />
+          </template>
         </div>
       </div>
 
@@ -425,6 +442,15 @@ onMounted(() => {
       :loading="confirmBusy"
       @confirm="runConfirm"
       @cancel="confirm = null"
+    />
+
+    <!-- 举报团队 -->
+    <ReportModal
+      :open="showReport"
+      target-type="workspace"
+      :target-id="wsId"
+      :target-name="workspace?.name ?? ''"
+      @close="showReport = false"
     />
   </div>
 </template>

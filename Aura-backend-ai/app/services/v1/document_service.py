@@ -1,6 +1,7 @@
 import logging
 from typing import Optional
 
+from pymilvus import MilvusException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -49,17 +50,32 @@ async def delete_document_service(kb_id: int,doc_id: int,db: AsyncSession) -> Re
     :param doc_id:  文档id
     :return: 删除结果
     """
+    kb_name = ""
     try:
         query_kb = select(KnowledgeBaseEntity).where(KnowledgeBaseEntity.id == kb_id)
         kb:Optional[KnowledgeBaseEntity] = (await db.execute(query_kb)).scalar_one_or_none()
+        if kb is None:
+            raise ValueError("并没有查询到该知识库")
+
         kb_name = f"aura_kb_{kb_id}_team" if kb.is_team == 1 else f"aura_kb_{kb_id}_personal"
+
+        await milvus_client.load_collection(kb_name)
 
         await milvus_client.delete(
             collection_name=kb_name,
             filter=f"document_id=={doc_id}"
         )
 
+        if kb_name != "":
+            await milvus_client.release_collection(kb_name)
+
         return Result.success(msg="从知识库中删除该文档成功")
 
+    except MilvusException as e:
+        return Result.error(msg=f"从知识库删除该文档失败: {str(e)}", code=500)
+
     except Exception as e:
+        if kb_name != "":
+            await milvus_client.release_collection(kb_name)
+
         return Result.error(msg=f"从知识库删除该文档失败: {str(e)}", code=500)

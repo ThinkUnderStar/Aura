@@ -7,6 +7,7 @@ import { toast } from '@/stores/toast'
 import type { Document, KnowledgeBase } from '@/types'
 import { DOC_STATUS } from '@/constants/enums'
 import { formatSize, formatTime } from '@/utils/format'
+import { toPreviewBlob } from '@/utils/file'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppModal from '@/components/ui/AppModal.vue'
@@ -14,6 +15,7 @@ import AppConfirm from '@/components/ui/AppConfirm.vue'
 import AppEmpty from '@/components/ui/AppEmpty.vue'
 import AppSpinner from '@/components/ui/AppSpinner.vue'
 import AppPagination from '@/components/ui/AppPagination.vue'
+import DocPreview from '@/components/document/DocPreview.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -33,6 +35,8 @@ const saving = ref(false)
 
 const deleting = ref<Document | null>(null)
 const deletingBusy = ref(false)
+
+const previewing = ref<Document | null>(null)
 
 const fileInput = ref<HTMLInputElement | null>(null)
 
@@ -69,14 +73,17 @@ async function loadDocs() {
 
 async function saveEdit() {
   const name = editForm.value.name.trim()
+  const description = editForm.value.description.trim()
   if (!name) return toast.error('名称不能为空')
+  // 描述必填：团队知识库编辑时不显示描述字段，仅个人知识库校验
+  if (kb.value?.isTeam !== 1 && !description) return toast.error('请输入知识库描述')
   saving.value = true
   try {
     if (kb.value?.isTeam === 1) {
       // 团队知识库：仅名称可改（后端按 type 逐项更新）
       await kbApi.updateTeam({ id: kbId.value, type: 'name', value: name })
     } else {
-      await kbApi.updateMy({ id: kbId.value, name, description: editForm.value.description.trim() || undefined })
+      await kbApi.updateMy({ id: kbId.value, name, description })
     }
     toast.success('已保存')
     showEdit.value = false
@@ -129,7 +136,7 @@ async function fetchContent(doc: Document, disposition: 'inline' | 'attachment')
       params: { documentId: doc.id, disposition },
       responseType: 'blob',
     })
-    const blob = res.data as Blob
+    const blob = toPreviewBlob(res.data as Blob, doc.fileType)
     const url = URL.createObjectURL(blob)
     if (disposition === 'inline') {
       window.open(url, '_blank')
@@ -231,7 +238,7 @@ onMounted(() => {
               <td class="px-5 py-3 text-muted">{{ formatTime(doc.createTime, false) }}</td>
               <td class="px-5 py-3">
                 <div class="flex justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                  <button class="rounded-sm p-1.5 text-faint hover:bg-surface-muted hover:text-ink" title="预览" @click="fetchContent(doc, 'inline')">
+                  <button class="rounded-sm p-1.5 text-faint hover:bg-surface-muted hover:text-ink" title="预览" @click="previewing = doc">
                     <AppIcon name="eye" :size="15" />
                   </button>
                   <button class="rounded-sm p-1.5 text-faint hover:bg-surface-muted hover:text-ink" title="下载" @click="fetchContent(doc, 'attachment')">
@@ -296,5 +303,8 @@ onMounted(() => {
       @confirm="remove"
       @cancel="deleting = null"
     />
+
+    <!-- 文档预览 -->
+    <DocPreview :open="!!previewing" :doc="previewing" @close="previewing = null" />
   </div>
 </template>

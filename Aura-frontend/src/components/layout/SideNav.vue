@@ -19,7 +19,7 @@ function isActive(path: string) {
   <aside class="w-60 shrink-0 flex-col border-r border-line bg-surface">
     <!-- 品牌 -->
     <div class="flex h-16 items-center gap-2.5 border-b border-line px-5">
-      <div class="flex h-7 w-7 items-center justify-center rounded-sm bg-ink text-white">
+      <div class="flex h-7 w-7 items-center justify-center rounded-sm bg-ink-solid text-white">
         <span class="font-serif text-sm leading-none">A</span>
       </div>
       <span class="font-serif text-lg tracking-tight text-ink">Aura</span>
