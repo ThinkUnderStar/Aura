@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import thinkunderstar.aura.aurabackendserver.common.Result;
@@ -21,6 +22,8 @@ import thinkunderstar.aura.aurabackendserver.util.RedisTokenBucketLimiter;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -234,5 +237,38 @@ public class SysFeedbackServiceImpl implements SysFeedbackService {
         }
 
         return Result.success(feedback);
+    }
+
+    /**
+     * 定时清除已完成/已关闭、且对应通知已被用户删除（不再与通知关联）的反馈记录
+     */
+    @Scheduled(cron = "0 0 4 * * ?")
+    public void cleanClosedFeedbacks() {
+        log.info("开始执行定时清除已关闭反馈任务...");
+        try {
+            // 仍被有效通知（用户未删除）引用的反馈ID，这些反馈不能清除
+            List<Long> referencedIds = notificationService.list(
+                            new LambdaQueryWrapper<Notification>()
+                                    .select(Notification::getRelatedId)
+                                    .eq(Notification::getType, "feedback_reply")
+                                    .eq(Notification::getStatus, 1)
+                    ).stream()
+                    .map(Notification::getRelatedId)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            // 已完成(2)/已关闭(3)，且不再被任何有效通知引用的反馈 -> 物理删除
+            LambdaQueryWrapper<Feedback> wrapper = new LambdaQueryWrapper<Feedback>()
+                    .in(Feedback::getStatus, 2, 3);
+            if (!referencedIds.isEmpty()) {
+                wrapper.notIn(Feedback::getId, referencedIds);
+            }
+            feedbackService.remove(wrapper);
+
+            log.info("定时清除已关闭反馈任务完成");
+        } catch (Exception e) {
+            log.error("定时清除已关闭反馈任务失败", e);
+        }
     }
 }

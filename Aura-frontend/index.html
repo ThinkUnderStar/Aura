@@ -5,6 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#F7F6F3" />
     <title>Aura · 智能体工作台</title>
+    <script>
+      // 首屏防闪白：Vue 挂载前先按本地偏好给 <html> 打上 dark 类
+      // 判定逻辑与 src/stores/theme.ts 保持一致
+      ;(function () {
+        try {
+          var mode = localStorage.getItem('aura_theme')
+          var dark =
+            mode === 'dark' || (mode !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          if (dark) document.documentElement.classList.add('dark')
+        } catch (e) {
+          /* 存储/媒体查询不可用时忽略，交由主题 store 兜底 */
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="app"></div>

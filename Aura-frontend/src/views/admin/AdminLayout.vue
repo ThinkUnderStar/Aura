@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/ui/AppIcon.vue'
 
 const router = useRouter()
+const route = useRoute()
 
 const tabs = [
   { name: '团队', path: '/admin/workspaces', icon: 'users' },
@@ -10,13 +11,22 @@ const tabs = [
   { name: '反馈', path: '/admin/feedbacks', icon: 'mail' },
   { name: '举报', path: '/admin/reports', icon: 'flag' },
 ]
+
+// 菜单高亮规则：
+// - 从举报进入团队详情/知识库时（from=report），保持高亮「举报」
+// - 团队知识库详情页（/admin/kb/*）属于团队上下文，归到「团队」
+function tabActive(t: { path: string }) {
+  if (route.query.from === 'report') return t.path === '/admin/reports'
+  if (route.path.startsWith('/admin/kb')) return t.path === '/admin/workspaces'
+  return route.path.startsWith(t.path)
+}
 </script>
 
 <template>
   <div class="flex h-screen flex-col">
     <header class="flex h-16 shrink-0 items-center justify-between border-b border-line bg-surface px-4 md:px-8">
       <div class="flex items-center gap-3">
-        <div class="flex h-7 w-7 items-center justify-center rounded-sm bg-ink text-white">
+        <div class="flex h-7 w-7 items-center justify-center rounded-sm bg-ink-solid text-white">
           <span class="font-serif text-sm leading-none">A</span>
         </div>
         <div class="flex items-center gap-2">
@@ -37,7 +47,7 @@ const tabs = [
         :key="t.path"
         :to="t.path"
         class="-mb-px flex items-center gap-1.5 border-b-2 px-4 py-3 text-sm transition-colors"
-        :class="$route.path.startsWith(t.path) ? 'border-ink font-medium text-ink' : 'border-transparent text-muted hover:text-ink'"
+        :class="tabActive(t) ? 'border-ink font-medium text-ink' : 'border-transparent text-muted hover:text-ink'"
       >
         <AppIcon :name="t.icon" :size="15" />
         {{ t.name }}

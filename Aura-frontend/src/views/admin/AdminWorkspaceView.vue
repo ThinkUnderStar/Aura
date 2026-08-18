@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { adminApi } from '@/api'
 import { toast } from '@/stores/toast'
 import type { Workspace } from '@/types'
@@ -17,6 +18,7 @@ const total = ref(0)
 const page = ref(1)
 const size = 20
 const loading = ref(false)
+const router = useRouter()
 const target = ref<Workspace | null>(null)
 const busy = ref(false)
 const keyword = ref('')
@@ -90,7 +92,14 @@ onMounted(load)
 
     <div class="mt-5 flex items-center gap-2">
       <div class="relative max-w-sm flex-1">
-        <AppIcon name="search" :size="15" class="absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
+        <button
+          type="button"
+          class="absolute left-1 top-1/2 -translate-y-1/2 rounded-sm p-1 text-faint transition-colors hover:text-ink"
+          title="按团队名称搜索"
+          @click="search"
+        >
+          <AppIcon name="search" :size="15" />
+        </button>
         <input v-model="keyword" class="input pl-9" placeholder="按团队名称搜索" @keydown.enter="search" />
       </div>
       <button class="btn-secondary" @click="search">搜索</button>
@@ -105,7 +114,12 @@ onMounted(load)
         <AppEmpty icon="users" title="暂无团队" />
       </div>
       <ul v-else class="divide-y divide-line">
-        <li v-for="ws in items" :key="ws.id" class="flex items-center gap-3 px-5 py-3">
+        <li
+          v-for="ws in items"
+          :key="ws.id"
+          class="flex cursor-pointer items-center gap-3 px-5 py-3 transition-colors hover:bg-surface-muted"
+          @click="router.push(`/admin/workspaces/${ws.id}`)"
+        >
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2">
               <p class="truncate text-sm font-medium text-ink">{{ ws.name }}</p>
@@ -115,7 +129,7 @@ onMounted(load)
           </div>
           <button
             :class="ws.status === WS_STATUS.BANNED ? 'btn-secondary' : 'btn-danger'"
-            @click="target = ws"
+            @click.stop="target = ws"
           >
             {{ ws.status === WS_STATUS.BANNED ? '解封' : '封禁' }}
           </button>

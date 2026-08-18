@@ -71,7 +71,7 @@ public interface SysWorkspaceMemberService {
     /**
      * 退出团队
      * <p>
-     * 当前用户主动退出指定的团队，退出后：
+     * 当前用户主动退出指定的团队（含已封禁的团队 status=2），退出后：
      * <ul>
      *     <li>用户的成员记录被物理删除，不再出现在团队成员列表中</li>
      *     <li>用户无法再查看该团队的文档、知识库及团队信息</li>
@@ -81,8 +81,9 @@ public interface SysWorkspaceMemberService {
      * <b>权限要求：</b>
      * <ul>
      *     <li>用户必须已登录</li>
-     *     <li>用户必须是该团队的正常成员（status=1）</li>
+     *     <li>用户必须是该团队的正常成员（status=1），或已封禁团队（status=2）的成员</li>
      *     <li>用户不能是群主（群主需先转让群主身份或解散团队）</li>
+     *     <li>已解散的团队（status=0）不支持退出，请使用清除团队记录接口</li>
      * </ul>
      *
      * @param workspaceId 团队ID

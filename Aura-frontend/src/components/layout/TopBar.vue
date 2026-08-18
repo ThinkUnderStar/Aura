@@ -3,13 +3,21 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notification'
+import { useThemeStore } from '@/stores/theme'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppAvatar from '@/components/ui/AppAvatar.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
 const notif = useNotificationStore()
+const theme = useThemeStore()
 const menuOpen = ref(false)
+
+const themeOptions = [
+  { value: 'light', label: '亮色', icon: 'sun' },
+  { value: 'dark', label: '暗色', icon: 'moon' },
+  { value: 'system', label: '跟随系统', icon: 'monitor' },
+] as const
 
 async function logout() {
   menuOpen.value = false
@@ -22,7 +30,7 @@ async function logout() {
   <header class="flex h-16 shrink-0 items-center justify-between border-b border-line bg-surface px-4 md:px-8">
     <!-- 移动端显示品牌（桌面由侧栏承担） -->
     <div class="flex items-center gap-2.5 md:hidden">
-      <div class="flex h-6 w-6 items-center justify-center rounded-sm bg-ink text-white">
+      <div class="flex h-6 w-6 items-center justify-center rounded-sm bg-ink-solid text-white">
         <span class="font-serif text-xs leading-none">A</span>
       </div>
       <span class="font-serif text-base tracking-tight text-ink">Aura</span>
@@ -38,7 +46,7 @@ async function logout() {
         <AppIcon name="bell" :size="18" />
         <span
           v-if="notif.unread > 0"
-          class="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-text px-1 text-[10px] font-medium leading-none text-white"
+          class="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-solid px-1 text-[10px] font-medium leading-none text-white"
         >
           {{ notif.unread > 99 ? '99+' : notif.unread }}
         </span>
@@ -64,6 +72,22 @@ async function logout() {
               <p class="truncate text-sm font-medium text-ink">{{ auth.user?.username }}</p>
               <p class="text-xs text-faint">{{ auth.user?.email || auth.user?.phone || '—' }}</p>
             </div>
+
+            <!-- 主题切换 -->
+            <div class="border-b border-line py-1.5">
+              <p class="px-4 pb-0.5 pt-1 text-[11px] font-medium text-faint">主题</p>
+              <button
+                v-for="t in themeOptions"
+                :key="t.value"
+                class="flex w-full items-center gap-2.5 px-4 py-1.5 text-sm text-ink transition-colors hover:bg-surface-muted"
+                @click="theme.setMode(t.value)"
+              >
+                <AppIcon :name="t.icon" :size="15" class="text-muted" />
+                <span class="flex-1 text-left">{{ t.label }}</span>
+                <AppIcon v-if="theme.mode === t.value" name="check" :size="14" class="text-muted" />
+              </button>
+            </div>
+
             <button
               class="flex w-full items-center gap-2.5 px-4 py-2 text-sm text-ink transition-colors hover:bg-surface-muted"
               @click="router.push('/profile'); menuOpen = false"

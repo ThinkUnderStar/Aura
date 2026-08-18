@@ -125,16 +125,17 @@ onMounted(load)
             <span class="text-xs text-faint">用户 {{ f.userId }}</span>
             <span class="ml-auto text-xs text-faint">{{ formatTime(f.createTime, false) }}</span>
           </div>
-          <p class="mt-2 text-sm font-medium text-ink">{{ f.title }}</p>
-          <p class="mt-1 whitespace-pre-line text-sm leading-6 text-muted">{{ f.content }}</p>
-          <p v-if="f.reply" class="mt-2 rounded-sm bg-surface-muted px-3 py-2 text-sm text-ink">回复：{{ f.reply }}</p>
+          <p class="mt-2 break-words text-sm font-medium text-ink">{{ f.title }}</p>
+          <p class="mt-1 whitespace-pre-line break-words text-sm leading-6 text-muted">{{ f.content }}</p>
+          <p v-if="f.reply" class="mt-2 break-words rounded-sm bg-surface-muted px-3 py-2 text-sm text-ink">回复：{{ f.reply }}</p>
           <div class="mt-3 flex flex-wrap items-center gap-2">
             <select
               class="rounded-sm border border-line bg-surface px-2 py-1.5 text-xs text-ink outline-none"
               :value="f.status"
               @change="setStatus(f, Number(($event.target as HTMLSelectElement).value))"
             >
-              <option v-for="s in STATUS_OPTIONS" :key="s" :value="s">{{ FEEDBACK_STATUS[s] }}</option>
+              <!-- 0=待处理 是提交后的初始态，后端不允许改回，仅作展示 -->
+              <option v-for="s in STATUS_OPTIONS" :key="s" :value="s" :disabled="s === 0">{{ FEEDBACK_STATUS[s] }}</option>
             </select>
             <button class="btn-secondary !px-3 !py-1.5 text-xs" @click="replying = f; reply = f.reply ?? ''">
               <AppIcon name="mail" :size="13" />

@@ -135,6 +135,26 @@ public class SysNotificationServiceImpl implements SysNotificationService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Result<Void> deleteReadNotifications() {
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (!redisTokenBucketLimiter.tryAcquireByUser(String.valueOf(loginId), 10, 2)) {
+            throw new BusinessException("操作过于频繁，请稍后再试");
+        }
+
+        Notification update = new Notification();
+        update.setStatus(0);
+        notificationService.update(update,
+                new LambdaQueryWrapper<Notification>()
+                        .eq(Notification::getUserId, loginId)
+                        .eq(Notification::getIsRead, 1)
+                        .eq(Notification::getStatus, 1)
+        );
+
+        return Result.success();
+    }
+
+    @Override
     public Result<Long> getUnreadCount() {
         long loginId = StpUtil.getLoginIdAsLong();
         if (!redisTokenBucketLimiter.tryAcquireByUser(String.valueOf(loginId), 30, 10)) {
@@ -145,6 +165,23 @@ public class SysNotificationServiceImpl implements SysNotificationService {
                 new LambdaQueryWrapper<Notification>()
                         .eq(Notification::getUserId, loginId)
                         .eq(Notification::getIsRead, 0)
+                        .eq(Notification::getStatus, 1)
+        );
+
+        return Result.success(count);
+    }
+
+    @Override
+    public Result<Long> getReadCount() {
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (!redisTokenBucketLimiter.tryAcquireByUser(String.valueOf(loginId), 30, 10)) {
+            throw new BusinessException("操作过于频繁，请稍后再试");
+        }
+
+        long count = notificationService.count(
+                new LambdaQueryWrapper<Notification>()
+                        .eq(Notification::getUserId, loginId)
+                        .eq(Notification::getIsRead, 1)
                         .eq(Notification::getStatus, 1)
         );
 

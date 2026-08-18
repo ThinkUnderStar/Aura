@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { nextTick, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { adminApi } from '@/api'
 import { toast } from '@/stores/toast'
 import type { Report } from '@/types'
@@ -12,12 +13,39 @@ import AppEmpty from '@/components/ui/AppEmpty.vue'
 import AppSpinner from '@/components/ui/AppSpinner.vue'
 import AppPagination from '@/components/ui/AppPagination.vue'
 
+const router = useRouter()
 const items = ref<Report[]>([])
 const total = ref(0)
 const page = ref(1)
 const size = 20
 const statusFilter = ref<number | undefined>(undefined)
 const loading = ref(false)
+
+// 离开举报页前往团队详情时暂存页码与滚动位置，返回时恢复
+const RETURN_KEY = 'admin:reports:return'
+
+function getScrollEl(): HTMLElement | null {
+  return document.querySelector('main')
+}
+
+async function openWorkspace(r: Report) {
+  // 进入前校验团队是否存在（/workspace/get/all 仅返回正常状态的团队，查不到即视为不存在）
+  let exists = false
+  try {
+    const { data } = await adminApi.workspaces(1, 100)
+    exists = data.code === 200 && data.data.records.some((w) => w.id === r.targetId)
+  } catch {
+    /* 拦截器已提示，停留在当前页 */
+    return
+  }
+  if (!exists) {
+    toast.error('该团队不存在或已被删除')
+    return
+  }
+  const el = getScrollEl()
+  sessionStorage.setItem(RETURN_KEY, JSON.stringify({ page: page.value, top: el?.scrollTop ?? 0 }))
+  router.push({ path: `/admin/workspaces/${r.targetId}`, query: { from: 'report' } })
+}
 
 const handling = ref<Report | null>(null)
 const handleStatus = ref<number>(1)
@@ -29,6 +57,12 @@ const STATUS_TONE: Record<number, 'yellow' | 'green' | 'red'> = {
   1: 'green',
   2: 'red',
 }
+
+// 处理举报仅支持“已处理/已驳回”，不含“待处理”
+const HANDLE_STATUS_OPTIONS = [
+  { value: 1, label: REPORT_STATUS[1] },
+  { value: 2, label: REPORT_STATUS[2] },
+]
 
 async function load() {
   loading.value = true
@@ -75,7 +109,23 @@ function onPage(p: number) {
   load()
 }
 
-onMounted(load)
+onMounted(async () => {
+  const raw = sessionStorage.getItem(RETURN_KEY)
+  sessionStorage.removeItem(RETURN_KEY)
+  let saved: { page?: number; top?: number } | null = null
+  if (raw) {
+    try {
+      saved = JSON.parse(raw)
+    } catch {
+      saved = null
+    }
+  }
+  if (saved?.page && saved.page > 1) page.value = saved.page
+  await load()
+  await nextTick()
+  const el = getScrollEl()
+  if (el && saved?.top != null) el.scrollTop = saved.top
+})
 </script>
 
 <template>
@@ -110,7 +160,13 @@ onMounted(load)
         <AppEmpty icon="flag" title="暂无举报" />
       </div>
       <ul v-else class="divide-y divide-line">
-        <li v-for="r in items" :key="r.id" class="px-5 py-4">
+        <li
+          v-for="r in items"
+          :key="r.id"
+          class="px-5 py-4"
+          :class="r.targetType === 'workspace' ? 'cursor-pointer transition-colors hover:bg-surface-muted' : ''"
+          @click="r.targetType === 'workspace' && openWorkspace(r)"
+        >
           <div class="flex items-center gap-2">
             <AppBadge tone="gray">{{ REPORT_TARGET[r.targetType] || r.targetType }}</AppBadge>
             <AppBadge tone="blue">{{ REPORT_REASON[r.reason] || r.reason }}</AppBadge>
@@ -118,7 +174,10 @@ onMounted(load)
             <span class="text-xs text-faint">举报人 {{ r.reporterId }}</span>
             <span class="ml-auto text-xs text-faint">{{ formatTime(r.createTime, false) }}</span>
           </div>
-          <p class="mt-2 text-sm text-muted">目标 ID：{{ r.targetId }}</p>
+          <p class="mt-2 flex items-center gap-2 text-sm text-muted">
+            目标 ID：{{ r.targetId }}
+            <AppIcon v-if="r.targetType === 'workspace'" name="chevron-right" :size="14" class="text-faint" />
+          </p>
           <p class="mt-1 whitespace-pre-line text-sm leading-6 text-ink">{{ r.description }}</p>
           <p v-if="r.handleResult" class="mt-2 rounded-sm bg-surface-muted px-3 py-2 text-sm text-ink">
             处理结果：{{ r.handleResult }}
@@ -126,7 +185,7 @@ onMounted(load)
           <div v-if="r.status === 0" class="mt-3 flex justify-end">
             <button
               class="btn-secondary !px-3 !py-1.5 text-xs"
-              @click="handling = r; handleStatus = 1; handleResult = ''"
+              @click.stop="handling = r; handleStatus = 1; handleResult = ''"
             >
               <AppIcon name="check" :size="13" />
               处理
@@ -145,13 +204,13 @@ onMounted(load)
           <label class="label">处理结果</label>
           <div class="flex gap-2">
             <button
-              v-for="(label, key) in REPORT_STATUS"
-              :key="key"
+              v-for="opt in HANDLE_STATUS_OPTIONS"
+              :key="opt.value"
               class="rounded-sm px-3 py-1.5 text-sm transition-colors"
-              :class="handleStatus === Number(key) ? 'bg-ink text-white' : 'text-muted hover:bg-surface-muted hover:text-ink'"
-              @click="handleStatus = Number(key)"
+              :class="handleStatus === opt.value ? 'bg-ink-solid text-white' : 'text-muted hover:bg-surface-muted hover:text-ink'"
+              @click="handleStatus = opt.value"
             >
-              {{ label }}
+              {{ opt.label }}
             </button>
           </div>
         </div>

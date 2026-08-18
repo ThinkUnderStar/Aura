@@ -134,6 +134,7 @@ public class SysWorkspaceController {
      * <p>
      * 群主解散团队，执行逻辑删除（status=0），团队及其关联数据（知识库、成员关系）将被标记为已解散。
      * 已解散的团队仍会显示在团队列表中，状态标记为“已解散”，用户可手动清除记录。
+     * 支持解散正常团队与已封禁的团队（status=2）；已解散（status=0）的团队不允许重复解散。
      * <p>
      * <b>权限要求：</b>
      * <ul>
@@ -144,7 +145,7 @@ public class SysWorkspaceController {
      * <b>操作影响：</b>
      * <ul>
      *     <li>团队状态变为已解散（status=0）</li>
-     *     <li>关联知识库被标记为已删除（status=0）</li>
+     *     <li>关联知识库被标记为已删除（status=0）；解散已封禁团队时其知识库已软删、kbId 已置空，不再重复处理</li>
      *     <li>解除所有 Agent 与知识库的绑定</li>
      *     <li>团队成员关系保留，成员可在列表中看到“已解散”状态</li>
      *     <li>Milvus Collection 立即删除（释放向量存储资源）</li>

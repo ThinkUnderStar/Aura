@@ -71,7 +71,7 @@ async function submit() {
     <div class="w-full max-w-sm">
       <!-- 品牌 -->
       <div class="mb-8 text-center">
-        <div class="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-ink text-white">
+        <div class="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-ink-solid text-white">
           <span class="font-serif text-lg leading-none">A</span>
         </div>
         <h1 class="font-serif text-xl tracking-tight text-ink">Aura</h1>

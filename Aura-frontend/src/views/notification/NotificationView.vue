@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { notificationApi } from '@/api'
 import { useNotificationStore } from '@/stores/notification'
 import { toast } from '@/stores/toast'
@@ -12,6 +12,7 @@ import AppEmpty from '@/components/ui/AppEmpty.vue'
 import AppSpinner from '@/components/ui/AppSpinner.vue'
 import AppPagination from '@/components/ui/AppPagination.vue'
 import AppConfirm from '@/components/ui/AppConfirm.vue'
+import AppModal from '@/components/ui/AppModal.vue'
 
 const notifStore = useNotificationStore()
 
@@ -22,6 +23,28 @@ const size = 20
 const filter = ref<'all' | 'unread' | 'read'>('all')
 const loading = ref(false)
 const deleting = ref<Notification | null>(null)
+const clearingRead = ref(false)
+const viewing = ref<Notification | null>(null)
+const hasUnread = computed(() => notifStore.unread > 0)
+const hasRead = computed(() => notifStore.read > 0)
+
+/** 把一条通知的内容拆成「你发出的」与「管理员回复」两部分（依据后端固定文案拆分） */
+function splitContent(n: Notification): { sent: string; reply: string } {
+  if (n.type === 'feedback_reply') {
+    const marker = '已收到管理员回复：'
+    const i = n.content.indexOf(marker)
+    if (i > -1) return { sent: n.content.slice(0, i), reply: n.content.slice(i + marker.length) }
+  }
+  if (n.type === 'report_result') {
+    const marker = '已被管理员'
+    const i = n.content.indexOf(marker)
+    if (i > -1) return { sent: n.content.slice(0, i), reply: n.content.slice(i + marker.length) }
+  }
+  // 无法拆分的场景（如“被举报人通知”），整体按「你发出的」展示
+  return { sent: n.content, reply: '' }
+}
+
+const viewingParts = computed(() => (viewing.value ? splitContent(viewing.value) : { sent: '', reply: '' }))
 
 async function load() {
   loading.value = true
@@ -55,7 +78,14 @@ async function markRead(n: Notification) {
   }
 }
 
+/** 点击通知：标记已读，并弹出完整消息 */
+function openDetail(n: Notification) {
+  markRead(n)
+  viewing.value = n
+}
+
 async function markAll() {
+  if (!hasUnread.value) return
   try {
     await notificationApi.readAll()
     toast.success('已全部标记为已读')
@@ -73,6 +103,18 @@ async function remove() {
     deleting.value = null
     await load()
     notifStore.refreshUnread()
+  } catch {
+    /* 拦截器已提示 */
+  }
+}
+
+async function clearRead() {
+  try {
+    await notificationApi.removeRead()
+    clearingRead.value = false
+    toast.success('已清除所有已读通知')
+    notifStore.refreshUnread()
+    await load()
   } catch {
     /* 拦截器已提示 */
   }
@@ -96,10 +138,26 @@ onMounted(() => {
         <h1 class="text-lg font-medium text-ink">通知</h1>
         <p class="mt-1 text-sm text-faint">系统消息与反馈回复。</p>
       </div>
-      <button class="btn-secondary" @click="markAll">
-        <AppIcon name="check" :size="15" />
-        全部已读
-      </button>
+      <div class="flex gap-2">
+        <button
+          class="btn-secondary"
+          :disabled="!hasUnread"
+          :title="hasUnread ? '将所有通知标记为已读' : '暂无未读通知'"
+          @click="markAll"
+        >
+          <AppIcon name="check" :size="15" />
+          全部已读
+        </button>
+        <button
+          class="btn-secondary"
+          :disabled="!hasRead"
+          :title="hasRead ? '清除所有已读通知' : '暂无已读通知'"
+          @click="clearingRead = true"
+        >
+          <AppIcon name="trash" :size="15" />
+          清除已读
+        </button>
+      </div>
     </div>
 
     <div class="mb-4 flex gap-1 border-b border-line">
@@ -127,7 +185,7 @@ onMounted(() => {
           :key="n.id"
           class="flex cursor-pointer items-start gap-3 px-5 py-4 transition-colors hover:bg-surface-muted"
           :class="{ 'bg-surface-muted/60': n.isRead === 0 }"
-          @click="markRead(n)"
+          @click="openDetail(n)"
         >
           <span
             class="mt-1.5 h-2 w-2 shrink-0 rounded-full"
@@ -140,7 +198,7 @@ onMounted(() => {
               </AppBadge>
               <p class="truncate text-sm font-medium text-ink">{{ n.title }}</p>
             </div>
-            <p class="mt-1 whitespace-pre-line text-sm leading-6 text-muted">{{ n.content }}</p>
+            <p class="mt-1 line-clamp-2 min-h-[3rem] whitespace-pre-line text-sm leading-6 text-muted">{{ n.content }}</p>
             <p class="mt-1.5 text-xs text-faint">{{ formatTime(n.createTime, false) }}</p>
           </div>
           <button
@@ -166,5 +224,38 @@ onMounted(() => {
       @confirm="remove"
       @cancel="deleting = null"
     />
+
+    <AppConfirm
+      :open="clearingRead"
+      title="清除已读通知"
+      message="确定清除所有已读通知吗？此操作不可恢复。"
+      confirm-text="清除"
+      :danger="true"
+      @confirm="clearRead"
+      @cancel="clearingRead = false"
+    />
+
+    <!-- 通知详情：点击通知后标记已读并展示完整消息 -->
+    <AppModal :open="!!viewing" :title="viewing?.title || '通知'" width="max-w-lg" @close="viewing = null">
+      <div v-if="viewing" class="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+        <div class="flex items-center gap-2">
+          <AppBadge :tone="viewing.type === 'feedback_reply' ? 'blue' : 'yellow'">
+            {{ NOTIFICATION_TYPE[viewing.type] || '系统' }}
+          </AppBadge>
+          <span class="text-xs text-faint">{{ formatTime(viewing.createTime, false) }}</span>
+        </div>
+        <template v-if="viewingParts.reply">
+          <div class="rounded-lg bg-surface-muted/70 p-3">
+            <p class="text-xs font-medium text-faint">你发出的</p>
+            <p class="mt-1 break-words whitespace-pre-line text-sm leading-6 text-ink">{{ viewingParts.sent }}</p>
+          </div>
+          <div class="rounded-lg bg-surface-muted/70 p-3">
+            <p class="text-xs font-medium text-faint">管理员回复</p>
+            <p class="mt-1 break-words whitespace-pre-line text-sm leading-6 text-ink">{{ viewingParts.reply }}</p>
+          </div>
+        </template>
+        <p v-else class="break-words whitespace-pre-line text-sm leading-6 text-muted">{{ viewing.content }}</p>
+      </div>
+    </AppModal>
   </div>
 </template>

@@ -66,7 +66,7 @@ const html = computed(() => {
 }
 .markdown-body h6 {
   font-size: 0.9em;
-  color: #787774;
+  color: var(--color-muted);
 }
 .markdown-body ul,
 .markdown-body ol {
@@ -85,12 +85,12 @@ const html = computed(() => {
 .markdown-body code {
   font-family: theme('fontFamily.mono');
   font-size: 0.85em;
-  background: #f1f0ec;
+  background: var(--color-code-bg);
   border-radius: 4px;
   padding: 0.1em 0.35em;
 }
 .markdown-body pre {
-  background: #f1f0ec;
+  background: var(--color-code-bg);
   border-radius: 8px;
   padding: 12px 14px;
   overflow-x: auto;
@@ -103,14 +103,14 @@ const html = computed(() => {
   line-height: 1.6;
 }
 .markdown-body blockquote {
-  border-left: 2px solid #e0dfda;
+  border-left: 2px solid var(--color-line-strong);
   padding-left: 0.8em;
-  color: #787774;
+  color: var(--color-muted);
   margin: 0.5em 0;
 }
 .markdown-body hr {
   border: none;
-  border-top: 1px solid #e0dfda;
+  border-top: 1px solid var(--color-line-strong);
   margin: 1em 0;
 }
 .markdown-body img {
@@ -119,10 +119,10 @@ const html = computed(() => {
 }
 .markdown-body input[type='checkbox'] {
   margin-right: 0.4em;
-  accent-color: #1a1a18;
+  accent-color: var(--color-ink);
 }
 .markdown-body a {
-  color: #1f6c9f;
+  color: var(--color-blue-text);
   text-decoration: underline;
 }
 .markdown-body table {
@@ -132,12 +132,12 @@ const html = computed(() => {
 }
 .markdown-body th,
 .markdown-body td {
-  border: 1px solid #eaeaea;
+  border: 1px solid var(--color-line);
   padding: 6px 10px;
   text-align: left;
 }
 .markdown-body th {
-  background: #f9f9f8;
+  background: var(--color-surface-muted);
   font-weight: 600;
 }
 </style>

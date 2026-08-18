@@ -34,6 +34,8 @@ const routes: RouteRecordRaw[] = [
     children: [
       { path: '', redirect: '/admin/workspaces' },
       { path: 'workspaces', name: 'admin-workspaces', component: () => import('@/views/admin/AdminWorkspaceView.vue') },
+      { path: 'workspaces/:workspaceId', name: 'admin-workspace-detail', component: () => import('@/views/admin/AdminWorkspaceDetailView.vue') },
+      { path: 'kb/:kbId', name: 'admin-kb-detail', component: () => import('@/views/admin/AdminKnowledgeBaseDetailView.vue') },
       { path: 'admins', name: 'admin-admins', component: () => import('@/views/admin/AdminAccountView.vue') },
       { path: 'feedbacks', name: 'admin-feedbacks', component: () => import('@/views/admin/AdminFeedbackView.vue') },
       { path: 'reports', name: 'admin-reports', component: () => import('@/views/admin/AdminReportView.vue') },

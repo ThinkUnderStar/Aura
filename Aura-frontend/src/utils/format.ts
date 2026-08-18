@@ -26,3 +26,12 @@ export function formatSize(bytes?: number | null): string {
 export function initialOf(name: string): string {
   return (name || '?').trim().charAt(0).toUpperCase()
 }
+
+/**
+ * 邮箱脱敏（与后端 DesensitizeUtils.desensitizeEmail 保持一致）
+ * 仅保留 @ 前首字符，其余替换为 ***，例如 test@example.com -> t***@example.com
+ */
+export function desensitizeEmail(email: string | null | undefined): string | null {
+  if (!email) return null
+  return email.replace(/(\w)\w+@/, '$1***@')
+}
