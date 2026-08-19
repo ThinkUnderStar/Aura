@@ -1,13 +1,19 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useThemeStore } from '@/stores/theme'
 import { MAIN_NAV } from '@/constants/nav'
+import { resolveAuraLogo } from '@/utils/auraLogo'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppAvatar from '@/components/ui/AppAvatar.vue'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const theme = useThemeStore()
+// 品牌 logo 随主题切换（暗色→白主体，亮色→黑主体），与智能体头像一致
+const brandLogo = computed(() => resolveAuraLogo(theme.isDark))
 
 function isActive(path: string) {
   if (path === '/chat') return route.path.startsWith('/chat')
@@ -19,8 +25,8 @@ function isActive(path: string) {
   <aside class="w-60 shrink-0 flex-col border-r border-line bg-surface">
     <!-- 品牌 -->
     <div class="flex h-16 items-center gap-2.5 border-b border-line px-5">
-      <div class="flex h-7 w-7 items-center justify-center rounded-sm bg-ink-solid text-white">
-        <span class="font-serif text-sm leading-none">A</span>
+      <div class="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-surface-muted p-1">
+        <img :src="brandLogo" alt="Aura" class="h-full w-full object-contain" />
       </div>
       <span class="font-serif text-lg tracking-tight text-ink">Aura</span>
     </div>

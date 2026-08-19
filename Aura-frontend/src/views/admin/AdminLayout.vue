@@ -1,9 +1,15 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useThemeStore } from '@/stores/theme'
+import { resolveAuraLogo } from '@/utils/auraLogo'
 import AppIcon from '@/components/ui/AppIcon.vue'
 
 const router = useRouter()
 const route = useRoute()
+const theme = useThemeStore()
+// 品牌 logo 随主题切换（暗色→白主体，亮色→黑主体），与智能体头像一致
+const brandLogo = computed(() => resolveAuraLogo(theme.isDark))
 
 const tabs = [
   { name: '团队', path: '/admin/workspaces', icon: 'users' },
@@ -27,8 +33,8 @@ function tabActive(t: { path: string }) {
   <div class="flex h-screen flex-col">
     <header class="flex h-16 shrink-0 items-center justify-between border-b border-line bg-surface px-4 md:px-8">
       <div class="flex items-center gap-3">
-        <div class="flex h-7 w-7 items-center justify-center rounded-sm bg-ink-solid text-white">
-          <span class="font-serif text-sm leading-none">A</span>
+        <div class="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-surface-muted p-1">
+          <img :src="brandLogo" alt="Aura" class="h-full w-full object-contain" />
         </div>
         <div class="flex items-center gap-2">
           <span class="font-serif text-base tracking-tight text-ink">Aura</span>

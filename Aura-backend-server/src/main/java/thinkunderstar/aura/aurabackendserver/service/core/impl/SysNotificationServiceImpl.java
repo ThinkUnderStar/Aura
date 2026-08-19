@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.extern.slf4j.Slf4j;
+import java.time.LocalDateTime;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import thinkunderstar.aura.aurabackendserver.common.Result;
@@ -186,5 +188,25 @@ public class SysNotificationServiceImpl implements SysNotificationService {
         );
 
         return Result.success(count);
+    }
+
+    /**
+     * 定时物理清理已逻辑删除(status=0)的通知：保留 7 天后删除，避免数据无限累积。
+     * 用户"清空已读"/"删除通知"只是置 status=0（updateTime 随之刷新），此处做最终清理。
+     */
+    @Scheduled(cron = "0 0 4 * * ?")
+    public void cleanDeletedNotifications() {
+        log.info("开始执行定时清除已删除通知任务...");
+        try {
+            LocalDateTime threshold = LocalDateTime.now().minusDays(7);
+            notificationService.remove(
+                    new LambdaQueryWrapper<Notification>()
+                            .eq(Notification::getStatus, 0)
+                            .lt(Notification::getUpdateTime, threshold)
+            );
+            log.info("定时清除已删除通知任务完成");
+        } catch (Exception e) {
+            log.error("定时清除已删除通知任务失败", e);
+        }
     }
 }

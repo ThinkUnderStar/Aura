@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notification'
 import { useThemeStore } from '@/stores/theme'
+import { resolveAuraLogo } from '@/utils/auraLogo'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppAvatar from '@/components/ui/AppAvatar.vue'
 
@@ -12,6 +13,8 @@ const auth = useAuthStore()
 const notif = useNotificationStore()
 const theme = useThemeStore()
 const menuOpen = ref(false)
+// 品牌 logo 随主题切换（暗色→白主体，亮色→黑主体），与智能体头像一致
+const brandLogo = computed(() => resolveAuraLogo(theme.isDark))
 
 const themeOptions = [
   { value: 'light', label: '亮色', icon: 'sun' },
@@ -30,8 +33,8 @@ async function logout() {
   <header class="flex h-16 shrink-0 items-center justify-between border-b border-line bg-surface px-4 md:px-8">
     <!-- 移动端显示品牌（桌面由侧栏承担） -->
     <div class="flex items-center gap-2.5 md:hidden">
-      <div class="flex h-6 w-6 items-center justify-center rounded-sm bg-ink-solid text-white">
-        <span class="font-serif text-xs leading-none">A</span>
+      <div class="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-surface-muted p-1">
+        <img :src="brandLogo" alt="Aura" class="h-full w-full object-contain" />
       </div>
       <span class="font-serif text-base tracking-tight text-ink">Aura</span>
     </div>
