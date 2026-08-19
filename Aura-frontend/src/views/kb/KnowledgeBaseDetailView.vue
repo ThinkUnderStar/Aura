@@ -72,18 +72,36 @@ async function loadDocs() {
 }
 
 async function saveEdit() {
+  const kbInfo = kb.value
+  if (!kbInfo) return
   const name = editForm.value.name.trim()
   const description = editForm.value.description.trim()
   if (!name) return toast.error('名称不能为空')
   // 描述必填：团队知识库编辑时不显示描述字段，仅个人知识库校验
-  if (kb.value?.isTeam !== 1 && !description) return toast.error('请输入知识库描述')
+  if (kbInfo.isTeam !== 1 && !description) return toast.error('请输入知识库描述')
+
+  // 后端一次仅允许修改 name 或 description 之一（type 指定），按变更项分别提交
+  const nameChanged = name !== kbInfo.name
+  const descChanged = description !== (kbInfo.description ?? '')
+  if (!nameChanged && !descChanged) {
+    showEdit.value = false
+    return
+  }
+
   saving.value = true
   try {
-    if (kb.value?.isTeam === 1) {
-      // 团队知识库：仅名称可改（后端按 type 逐项更新）
-      await kbApi.updateTeam({ id: kbId.value, type: 'name', value: name })
+    if (kbInfo.isTeam === 1) {
+      // 团队知识库：编辑表单仅含名称（描述字段不展示），只提交名称变更
+      if (nameChanged) {
+        await kbApi.updateTeam({ kbId: kbId.value, type: 'name', name })
+      }
     } else {
-      await kbApi.updateMy({ id: kbId.value, name, description })
+      if (nameChanged) {
+        await kbApi.updateMy({ kbId: kbId.value, type: 'name', name })
+      }
+      if (descChanged) {
+        await kbApi.updateMy({ kbId: kbId.value, type: 'description', description })
+      }
     }
     toast.success('已保存')
     showEdit.value = false

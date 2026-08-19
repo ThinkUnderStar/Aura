@@ -119,13 +119,23 @@ async function saveRename() {
   const description = renameForm.value.description.trim()
   if (!name) return toast.error('名称不能为空')
   if (!description) return toast.error('请输入知识库描述')
+
+  // 后端一次仅允许修改 name 或 description 之一（type 指定），按变更项分别提交
+  const nameChanged = name !== renaming.value.name
+  const descChanged = description !== (renaming.value.description ?? '')
+  if (!nameChanged && !descChanged) {
+    renaming.value = null
+    return
+  }
+
   renamingBusy.value = true
   try {
-    await kbApi.updateMy({
-      id: renaming.value.id,
-      name,
-      description,
-    })
+    if (nameChanged) {
+      await kbApi.updateMy({ kbId: renaming.value.id, type: 'name', name })
+    }
+    if (descChanged) {
+      await kbApi.updateMy({ kbId: renaming.value.id, type: 'description', description })
+    }
     toast.success('已保存')
     renaming.value = null
     await load()

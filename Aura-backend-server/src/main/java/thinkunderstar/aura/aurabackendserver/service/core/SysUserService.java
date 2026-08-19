@@ -1,11 +1,11 @@
 package thinkunderstar.aura.aurabackendserver.service.core;
 
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.multipart.MultipartFile;
 import thinkunderstar.aura.aurabackendserver.common.Result;
 import thinkunderstar.aura.aurabackendserver.dto.request.AiImageDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.PromptDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.UpdateUserDto;
+import thinkunderstar.aura.aurabackendserver.dto.response.UserVODto;
 
 public interface SysUserService {
     /**
@@ -98,4 +98,20 @@ public interface SysUserService {
      * @return Result 保存结果，成功返回新头像的访问URL
      */
     Result<String> saveGeneratedImage( AiImageDto aiImageDto);
+
+    /**
+     * 根据用户ID获取指定用户的详细信息（仅限管理员调用）
+     * <p>
+     * 该接口用于后台管理员查看任意用户的基本资料。接口通过 Sa-Token 框架进行双重鉴权：
+     * <ul>
+     *     <li>{@code @SaCheckLogin}：确保请求方已通过身份认证（已登录）</li>
+     *     <li>{@code @SaCheckRole("admin")}：确保当前登录用户具有管理员角色（ROLE_admin），防止普通用户越权查看</li>
+     * </ul>
+     * </p>
+     *
+     * @param userId 待查询的目标用户ID（路径变量，必填）
+     * @return Result<UserVODto> 响应体，若用户存在则返回成功状态及用户实体信息；
+     *         若用户不存在或已被逻辑删除，则返回业务异常（由 Service 层抛出，全局处理器捕获）
+     */
+    Result<UserVODto> getUser(Long userId);
 }

@@ -75,10 +75,11 @@ const { data } = await agentApi.list()
 - 桌面（`md+`）：左侧 240px 固定侧栏 + 顶栏
 - 移动：底部标签栏 + 顶栏（品牌 + 通知 + 用户菜单）
 
-## 待后端确认 / 已知限制
+## 已知限制 / 说明
 
-以下点因后端未提供对应能力或字段语义未完全确认，已在代码中标注，接入时需核对：
+前后端已完成联调，以下为当前实现的有意取舍或已知限制：
 
-1. **用户分页列表接口缺失**：`SysUserController` 无「用户列表」接口，管理后台「用户管理」页暂以「按 ID 封禁/解封」占位，待后端补充列表接口后接入。
-2. **DTO 字段语义**：`SetRoleDto`（`type: 'set_admin' | 'remove_admin'`）、`UpdateWorkspaceDto`（`workspaceId` 字段）、`AiImageDto`（AI 生成头像的临时文件名）、`BanUserDto`（`type` 的临时/永久语义）等字段命名/取值，接入真实后端时需按实际 DTO 微调。
-3. **知识库 `status` 语义**：逻辑删除后的状态值未完全确认，列表页未强依赖该字段。
+1. **管理后台「用户管理」按 ID 操作**：`SysUserController` 未提供分页用户列表接口，`AdminUserView` 采用「输入用户 ID 查询 → 封禁 / 延长封禁 / 解封」的交互。
+2. **知识库 `status` 语义**：逻辑删除后的状态值未在前后端完全约定，列表页未强依赖该字段。
+
+其余 DTO 字段语义已与后端核对对齐：`SetRoleDto` 为 `workspaceId/memberId/setRole`，`AiImageDto` 为 `imageName/isSaved`，`BanUserDto` 的 `type` 为「1 封禁 / 2 延长」、`banTime` 为空表示永久封禁，`UpdateKnowledgeBaseDto` 为 `kbId + type('name'|'description') + name/description`（`/kb/update/my` 与 `/kb/update/team` 同契约）。

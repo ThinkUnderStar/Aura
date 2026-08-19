@@ -13,6 +13,7 @@ import thinkunderstar.aura.aurabackendserver.common.Result;
 import thinkunderstar.aura.aurabackendserver.dto.request.AiImageDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.PromptDto;
 import thinkunderstar.aura.aurabackendserver.dto.request.UpdateUserDto;
+import thinkunderstar.aura.aurabackendserver.dto.response.UserVODto;
 import thinkunderstar.aura.aurabackendserver.entity.User;
 import thinkunderstar.aura.aurabackendserver.exception.BusinessException;
 import thinkunderstar.aura.aurabackendserver.service.core.AuthService;
@@ -270,6 +271,40 @@ public class SysUserServiceImpl implements SysUserService {
 
             return Result.success(user.getAvatar());
         }
+    }
+
+    @Override
+    public Result<UserVODto> getUser(Long userId) {
+        if (userId == null) {
+            throw new BusinessException("获取该用户信息接口的参数接收异常");
+        }
+
+        //限流
+        long loginId = StpUtil.getLoginIdAsLong();
+        if (!redisTokenBucketLimiter.tryAcquireByUser(String.valueOf(loginId),20,5)){
+            throw new BusinessException("获取用户信息过于频繁，请稍后再试");
+        }
+
+        User user = userService.getById(userId);
+        if (user == null || user.getDeleted() == 1) {
+            throw new BusinessException("该用户不存在");
+        }
+
+        UserVODto userVODto = new UserVODto(
+                user.getId(),
+                user.getUsername(),
+                user.getPhone(),
+                user.getEmail(),
+                user.getAvatar(),
+                user.getRole(),
+                user.getStatus(),
+                user.getBanStartTime(),
+                user.getBanEndTime(),
+                user.getBanReason(),
+                user.getBanBy()
+        );
+
+        return Result.success(userVODto);
     }
 
     //修改用户的昵称

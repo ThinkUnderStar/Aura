@@ -73,10 +73,18 @@ export const kbApi = {
     http.get<Result<Page<KnowledgeBase>>>('/kb/get', { params: { page, pageSize } }),
   team: (workspaceId: number) => http.get<Result<KnowledgeBase>>(`/kb/get/${workspaceId}`),
   detail: (kbId: number) => http.get<Result<KnowledgeBase>>(`/kb/get/${kbId}/details`),
-  updateMy: (data: { id: number; name: string; description: string }) =>
-    http.put<Result<KnowledgeBase>>('/kb/update/my', data),
-  updateTeam: (data: { id: number; type: 'name' | 'description'; value: string }) =>
-    http.put<Result<KnowledgeBase>>('/kb/update/team', data),
+  updateMy: (data: {
+    kbId: number
+    type: 'name' | 'description'
+    name?: string
+    description?: string
+  }) => http.put<Result<KnowledgeBase>>('/kb/update/my', data),
+  updateTeam: (data: {
+    kbId: number
+    type: 'name' | 'description'
+    name?: string
+    description?: string
+  }) => http.put<Result<KnowledgeBase>>('/kb/update/team', data),
   logicDelete: (id: number) => http.delete<Result<KnowledgeBase>>('/kb/delete/logic', { params: { id } }),
   forceDelete: (id: number) => http.delete<Result<void>>('/kb/delete/force', { params: { id } }),
   restore: (id: number) => http.put<Result<KnowledgeBase>>('/kb/restore', null, { params: { id } }),
@@ -105,8 +113,12 @@ export const wsApi = {
     http.get<Result<Page<WorkspaceVO>>>('/workspace/search', { params: { keyWord, page, size } }),
   create: (data: { name: string; description?: string; kbName: string; kbDescription: string }) =>
     http.post<Result<WorkspaceVO>>('/workspace/create', data),
-  update: (data: { workspaceId: number; name?: string; description?: string }) =>
-    http.post<Result<WorkspaceVO>>('/workspace/update', data),
+  update: (data: {
+    workspaceId: number
+    type: 'name' | 'description'
+    name?: string
+    description?: string
+  }) => http.post<Result<WorkspaceVO>>('/workspace/update', data),
   uploadLogo: (workspaceId: number, file: File) => {
     const fd = new FormData()
     fd.append('file', file)
@@ -195,4 +207,9 @@ export const adminApi = {
     http.get<Result<Page<Report>>>('/report/list', { params: { page, size, status, targetType } }),
   handleReport: (data: { reportId: number; status: number; handleResult: string }) =>
     http.put<Result<void>>('/report/handle', data),
+  getUser: (userId: number) => http.get<Result<UserVO>>(`/user/get/${userId}`),
+  banUser: (data: { targetUserId: number; type: number; banReason: string; banTime: number | null }) =>
+    http.put<Result<void>>('/auth/ban', data),
+  unbanUser: (targetUserId: number) =>
+    http.put<Result<void>>('/auth/unban', null, { params: { targetUserId } }),
 }

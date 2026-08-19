@@ -147,12 +147,37 @@ async function resetInvite() {
   }
 }
 
+function openEdit() {
+  // 打开弹窗时重置为当前值，保证“对比变更”以最新数据为准
+  if (workspace.value) {
+    editForm.value = { name: workspace.value.name, description: workspace.value.description ?? '' }
+  }
+  showEdit.value = true
+}
+
 async function saveEdit() {
+  if (!workspace.value) return
   const name = editForm.value.name.trim()
   if (!name) return toast.error('名称不能为空')
+  const description = editForm.value.description.trim()
+
+  // 后端一次仅允许修改 name 或 description 之一（type 指定），按变更项分别提交
+  const nameChanged = name !== workspace.value.name
+  const descChanged = description !== (workspace.value.description ?? '')
+
+  if (!nameChanged && !descChanged) {
+    showEdit.value = false
+    return
+  }
+
   saving.value = true
   try {
-    await wsApi.update({ workspaceId: wsId.value, name, description: editForm.value.description.trim() || undefined })
+    if (nameChanged) {
+      await wsApi.update({ workspaceId: wsId.value, type: 'name', name })
+    }
+    if (descChanged) {
+      await wsApi.update({ workspaceId: wsId.value, type: 'description', description })
+    }
     toast.success('已保存')
     showEdit.value = false
     await loadWorkspace()
@@ -250,7 +275,7 @@ onMounted(() => {
             举报
           </button>
           <template v-if="isOwner || isAdmin">
-            <button class="btn-secondary" @click="showEdit = true">
+            <button class="btn-secondary" @click="openEdit">
               <AppIcon name="edit" :size="15" />
               编辑
             </button>

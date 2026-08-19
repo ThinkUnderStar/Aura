@@ -634,6 +634,9 @@ public class AuthServiceImpl implements AuthService {
 
         userService.updateById(targetUser);
 
+        //封禁后立即踢下线，作废该用户全部token（所有设备同时失效）
+        StpUtil.logout(targetUser.getId());
+
         return Result.success();
     }
 }
