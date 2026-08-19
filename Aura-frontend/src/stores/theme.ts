@@ -27,10 +27,13 @@ function writeStored(m: ThemeMode) {
 
 export const useThemeStore = defineStore('theme', () => {
   const mode = ref<ThemeMode>(readStored())
+  // 当前生效的明暗（含 system 模式的实时解析），供头像等组件按主题切换资源
+  const isDark = ref(false)
 
   function apply() {
     const prefersDark = window.matchMedia(DARK_MQ).matches
     const dark = mode.value === 'dark' || (mode.value === 'system' && prefersDark)
+    isDark.value = dark
     document.documentElement.classList.toggle('dark', dark)
     // 同步浏览器 UI（地址栏等）的主题色，与 index.html 的 meta 一致
     document
@@ -59,5 +62,5 @@ export const useThemeStore = defineStore('theme', () => {
 
   apply()
 
-  return { mode, setMode }
+  return { mode, isDark, setMode }
 })

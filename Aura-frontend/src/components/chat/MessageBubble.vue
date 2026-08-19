@@ -2,8 +2,10 @@
 import { computed, ref } from 'vue'
 import type { MessageVO } from '@/types'
 import { useAuthStore } from '@/stores/auth'
+import { useThemeStore } from '@/stores/theme'
 import { toast } from '@/stores/toast'
 import { formatTime } from '@/utils/format'
+import { resolveAuraLogo } from '@/utils/auraLogo'
 import Markdown from '@/components/ui/Markdown.vue'
 import AppAvatar from '@/components/ui/AppAvatar.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
@@ -13,6 +15,10 @@ const emit = defineEmits<{
   (e: 'edit-submit', message: MessageVO, newContent: string): void
 }>()
 const auth = useAuthStore()
+const theme = useThemeStore()
+
+// Aura 智能体头像：按当前主题切换（暗色→白主体，亮色→黑主体）
+const auraAvatar = computed(() => resolveAuraLogo(theme.isDark))
 
 const isUser = computed(() => props.message.role === 'user')
 const isTool = computed(() => props.message.role === 'tool_confirm')
@@ -144,8 +150,8 @@ function copy() {
 
   <!-- 助手消息：左对齐，Markdown 渲染 -->
   <div v-else class="group flex gap-3">
-    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink-solid text-white">
-      <span class="font-serif text-xs leading-none">A</span>
+    <div class="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-surface p-1.5">
+      <img :src="auraAvatar" alt="Aura" class="h-full w-full object-contain" />
     </div>
     <div class="min-w-0 max-w-[80%]">
       <p class="text-xs text-faint">Aura</p>

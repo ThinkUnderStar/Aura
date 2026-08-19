@@ -1,16 +1,21 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notification'
+import { useThemeStore } from '@/stores/theme'
 import { authApi } from '@/api'
 import { toast } from '@/stores/toast'
+import { resolveAuraLogo } from '@/utils/auraLogo'
 import AppIcon from '@/components/ui/AppIcon.vue'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 const notif = useNotificationStore()
+const theme = useThemeStore()
+// 品牌 logo 随主题切换（暗色→白主体，亮色→黑主体）
+const brandLogo = computed(() => resolveAuraLogo(theme.isDark))
 
 const way = ref<1 | 2>(1) // 1-密码 2-验证码
 const form = reactive({ username: '', password: '', code: '' })
@@ -71,8 +76,8 @@ async function submit() {
     <div class="w-full max-w-sm">
       <!-- 品牌 -->
       <div class="mb-8 text-center">
-        <div class="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-ink-solid text-white">
-          <span class="font-serif text-lg leading-none">A</span>
+        <div class="mx-auto mb-3 flex h-10 w-10 items-center justify-center overflow-hidden rounded-md bg-surface-muted p-1.5">
+          <img :src="brandLogo" alt="Aura" class="h-full w-full object-contain" />
         </div>
         <h1 class="font-serif text-xl tracking-tight text-ink">Aura</h1>
         <p class="mt-1 text-sm text-faint">登录智能体工作台</p>

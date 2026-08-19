@@ -7,7 +7,9 @@ import { agentApi, chatApi } from '@/api'
 import type { InterruptPayload, StreamHandlers } from '@/api/sse'
 import { useChatStreamStore } from '@/stores/chatStream'
 import { useChatUIStore } from '@/stores/chatUI'
+import { useThemeStore } from '@/stores/theme'
 import { toast } from '@/stores/toast'
+import { resolveAuraLogo } from '@/utils/auraLogo'
 import type { Agent, MessageVO } from '@/types'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
 import ChatInput from '@/components/chat/ChatInput.vue'
@@ -21,6 +23,9 @@ import AppConfirm from '@/components/ui/AppConfirm.vue'
 
 const route = useRoute()
 const router = useRouter()
+const theme = useThemeStore()
+// Aura 智能体头像：按当前主题切换（暗色→白主体，亮色→黑主体）
+const auraAvatar = computed(() => resolveAuraLogo(theme.isDark))
 
 const agents = ref<Agent[]>([])
 const messages = ref<MessageVO[]>([])
@@ -377,8 +382,8 @@ init()
 
       <!-- 空对话 -->
       <div v-else-if="!hasMessages" class="mx-auto max-w-2xl py-20 text-center">
-        <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-md bg-ink-solid text-white">
-          <span class="font-serif text-lg leading-none">A</span>
+        <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center overflow-hidden rounded-md bg-surface-muted p-2">
+          <img :src="auraAvatar" alt="Aura" class="h-full w-full object-contain" />
         </div>
         <h2 class="font-serif text-lg text-ink">与 {{ currentAgent?.name }} 对话</h2>
         <p class="mx-auto mt-2 max-w-sm text-sm leading-6 text-faint">
@@ -398,8 +403,8 @@ init()
 
         <!-- 流式输出气泡（仅当前智能体生成时显示；切回来可继续看到并续写） -->
         <div v-if="currentStreaming || currentStreamingText" class="flex gap-3">
-          <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink-solid text-white">
-            <span class="font-serif text-xs leading-none">A</span>
+          <div class="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-surface p-1.5">
+            <img :src="auraAvatar" alt="Aura" class="h-full w-full object-contain" />
           </div>
           <div class="min-w-0 max-w-[80%]">
             <p class="text-xs text-faint">Aura</p>

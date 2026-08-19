@@ -1,11 +1,16 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useThemeStore } from '@/stores/theme'
 import { authApi } from '@/api'
 import { toast } from '@/stores/toast'
+import { resolveAuraLogo } from '@/utils/auraLogo'
 import AppIcon from '@/components/ui/AppIcon.vue'
 
 const router = useRouter()
+const theme = useThemeStore()
+// 品牌 logo 随主题切换（暗色→白主体，亮色→黑主体）
+const brandLogo = computed(() => resolveAuraLogo(theme.isDark))
 
 const form = reactive({ username: '', phone: '', password: '', repeatPassword: '', code: '' })
 const showPwd = ref(false)
@@ -60,8 +65,8 @@ async function submit() {
   <div class="flex min-h-screen items-center justify-center px-4 py-12">
     <div class="w-full max-w-sm">
       <div class="mb-8 text-center">
-        <div class="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-md bg-ink-solid text-white">
-          <span class="font-serif text-lg leading-none">A</span>
+        <div class="mx-auto mb-3 flex h-10 w-10 items-center justify-center overflow-hidden rounded-md bg-surface-muted p-1.5">
+          <img :src="brandLogo" alt="Aura" class="h-full w-full object-contain" />
         </div>
         <h1 class="font-serif text-xl tracking-tight text-ink">创建账号</h1>
         <p class="mt-1 text-sm text-faint">加入 Aura 智能体工作台</p>

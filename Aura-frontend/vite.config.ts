@@ -9,6 +9,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      // Aura logo 图片目录（网页图标 / 智能体头像共用，直接以模块方式引用）
+      '@logo': fileURLToPath(new URL('./pictures/logo', import.meta.url)),
     },
   },
   server: {
