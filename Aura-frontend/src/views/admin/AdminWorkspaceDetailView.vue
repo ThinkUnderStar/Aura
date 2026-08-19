@@ -217,7 +217,10 @@ onMounted(() => {
           <li v-for="m in members" :key="m.userId" class="flex items-center gap-3 px-5 py-3">
             <AppAvatar :src="m.avatar" :name="m.username" :size="36" />
             <div class="min-w-0 flex-1">
-              <p class="truncate text-sm font-medium text-ink">{{ m.username }}</p>
+              <p class="truncate text-sm font-medium text-ink">
+                {{ m.username }}
+                <span class="ml-1 text-xs font-normal text-faint">ID {{ m.userId }}</span>
+              </p>
               <p class="text-xs text-faint">加入于 {{ formatTime(m.joinedAt, false) }}</p>
             </div>
             <AppBadge :tone="ROLE_TONE[m.role] ?? 'gray'">{{ ROLE_LABEL[m.role] ?? '成员' }}</AppBadge>

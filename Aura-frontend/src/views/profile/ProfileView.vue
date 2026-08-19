@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { authApi, userApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
+import { useAvatarGenStore } from '@/stores/avatarGen'
 import { toast } from '@/stores/toast'
 import { assetUrl } from '@/utils/asset'
 import { desensitizeEmail } from '@/utils/format'
@@ -23,11 +24,9 @@ const savingEmail = ref(false)
 const avatarInput = ref<HTMLInputElement | null>(null)
 const uploadingAvatar = ref(false)
 
-const showGenerate = ref(false)
-const prompt = ref('')
-const generating = ref(false)
-const generated = ref<string | null>(null)
+const gen = useAvatarGenStore()
 const savingGenerated = ref(false)
+const discarding = ref(false)
 
 const showDelete = ref(false)
 const deleting = ref(false)
@@ -118,35 +117,68 @@ async function onAvatar(e: Event) {
 }
 
 async function generate() {
-  if (!prompt.value.trim()) return toast.error('请输入头像描述')
-  generating.value = true
+  if (!gen.prompt.trim()) return toast.error('请输入头像描述')
+  gen.generating = true
   try {
-    const { data } = await userApi.generateAvatar(prompt.value.trim())
-    generated.value = data.code === 200 ? data.data : null
+    const { data } = await userApi.generateAvatar(gen.prompt.trim())
+    gen.generated = data.code === 200 ? data.data : null
   } catch {
     /* 拦截器已提示 */
   } finally {
-    generating.value = false
+    gen.generating = false
   }
 }
 
 async function saveGenerated() {
-  if (!generated.value) return
+  if (!gen.generated) return
   savingGenerated.value = true
   try {
     // 后端期望的是纯文件名（不含 /temp_images/ 前缀），且 isSaved=1 表示保存为头像
-    const imageName = generated.value.replace(/^\/temp_images\//, '')
+    const imageName = gen.generated.replace(/^\/temp_images\//, '')
     const { data } = await userApi.saveGeneratedAvatar(imageName, 1)
     if (data.code === 200 && data.data) auth.updateUser({ avatar: data.data })
     toast.success('头像已保存')
-    showGenerate.value = false
-    generated.value = null
-    prompt.value = ''
+    gen.reset()
   } catch {
     /* 拦截器已提示 */
   } finally {
     savingGenerated.value = false
   }
+}
+
+/** 删除临时图片：复用 /avatar/generate/save 的 isSaved=0 分支，删除失败不阻断 */
+async function deleteTempImage() {
+  if (!gen.generated) return
+  const imageName = gen.generated.replace(/^\/temp_images\//, '')
+  try {
+    await userApi.saveGeneratedAvatar(imageName, 0)
+  } catch {
+    /* 拦截器已提示；文件不存在/限流等场景由后端定时任务兜底清理 */
+  }
+}
+
+/** 放弃当前生成结果：删除临时图片并回到输入状态 */
+async function discardGenerated() {
+  if (!gen.generated) return
+  discarding.value = true
+  try {
+    await deleteTempImage()
+  } finally {
+    gen.generated = null
+    discarding.value = false
+  }
+}
+
+/** 重新生成：先删除旧临时图，再复用 /avatar/generate（后端每次随机种子出图） */
+async function regenerate() {
+  if (!gen.generated) return
+  gen.generating = true
+  try {
+    await deleteTempImage()
+  } finally {
+    gen.generated = null
+  }
+  generate()
 }
 
 async function logout() {
@@ -188,7 +220,7 @@ async function deleteAccount() {
               <AppIcon :name="uploadingAvatar ? 'refresh' : 'upload'" :size="14" :class="uploadingAvatar ? 'animate-spin' : ''" />
               上传头像
             </button>
-            <button class="btn-secondary !px-3 !py-1.5 text-xs" @click="showGenerate = true">
+            <button class="btn-secondary !px-3 !py-1.5 text-xs" @click="gen.open()">
               <AppIcon name="sparkle" :size="14" />
               AI 生成头像
             </button>
@@ -276,25 +308,32 @@ async function deleteAccount() {
     </div>
 
     <!-- AI 生成头像 -->
-    <AppModal :open="showGenerate" title="AI 生成头像" @close="showGenerate = false">
+    <AppModal :open="gen.showGenerate" title="AI 生成头像" @close="gen.close()">
       <label class="label">描述</label>
-      <input v-model="prompt" class="input" placeholder="例如：简约几何风格的抽象头像" @keydown.enter="generate" />
-      <div v-if="generating" class="mt-4 flex justify-center py-6">
+      <input v-model="gen.prompt" class="input" placeholder="例如：简约几何风格的抽象头像" @keydown.enter="generate" />
+      <div v-if="gen.generating" class="mt-4 flex justify-center py-6">
         <AppIcon name="refresh" :size="20" class="animate-spin text-faint" />
       </div>
-      <div v-else-if="generated" class="mt-4 flex flex-col items-center gap-3">
-        <img :src="assetUrl(generated)" alt="生成头像预览" class="h-28 w-28 rounded-lg border border-line object-cover" />
-        <p class="text-xs text-faint">预览满意后可保存为头像</p>
+      <div v-else-if="gen.generated" class="mt-4 flex flex-col items-center gap-3">
+        <img :src="assetUrl(gen.generated)" alt="生成头像预览" class="h-28 w-28 rounded-lg border border-line object-cover" />
+        <p class="text-xs text-faint">预览满意后可保存为头像，不满意可重新生成</p>
       </div>
       <div class="mt-5 flex justify-end gap-2">
-        <button class="btn-secondary" @click="showGenerate = false">取消</button>
-        <button v-if="!generated" class="btn-primary" :disabled="generating" @click="generate">
-          生成
-        </button>
-        <button v-else class="btn-primary" :disabled="savingGenerated" @click="saveGenerated">
-          <AppIcon v-if="savingGenerated" name="refresh" :size="14" class="animate-spin" />
-          保存为头像
-        </button>
+        <template v-if="!gen.generated">
+          <button class="btn-secondary" @click="gen.close()">取消</button>
+          <button class="btn-primary" :disabled="gen.generating" @click="generate">生成</button>
+        </template>
+        <template v-else>
+          <button class="btn-secondary" :disabled="discarding" @click="discardGenerated">
+            <AppIcon v-if="discarding" name="refresh" :size="14" class="animate-spin" />
+            放弃
+          </button>
+          <button class="btn-secondary" @click="regenerate">重新生成</button>
+          <button class="btn-primary" :disabled="savingGenerated" @click="saveGenerated">
+            <AppIcon v-if="savingGenerated" name="refresh" :size="14" class="animate-spin" />
+            保存为头像
+          </button>
+        </template>
       </div>
     </AppModal>
 
