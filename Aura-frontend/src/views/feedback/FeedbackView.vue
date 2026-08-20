@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { reactive, ref } from 'vue'
 import { feedbackApi } from '@/api'
 import { toast } from '@/stores/toast'
+import { required } from '@/utils/validate'
 import { FEEDBACK_TYPE } from '@/constants/enums'
 import AppIcon from '@/components/ui/AppIcon.vue'
 
@@ -9,9 +10,18 @@ import AppIcon from '@/components/ui/AppIcon.vue'
 const form = ref({ type: 'bug', title: '', content: '', contact: '' })
 const submitting = ref(false)
 
+// 实时校验：标题/内容后端仅要求非空（type 由上方按钮枚举限定）
+const errors = reactive<Record<string, string>>({ title: '', content: '' })
+
+function validateField(field: 'title' | 'content') {
+  if (field === 'title') errors.title = required(form.value.title.trim(), '请输入标题') ?? ''
+  else errors.content = required(form.value.content.trim(), '请输入内容') ?? ''
+}
+
 async function submit() {
-  if (!form.value.title.trim()) return toast.error('请输入标题')
-  if (!form.value.content.trim()) return toast.error('请输入内容')
+  ;(['title', 'content'] as const).forEach(validateField)
+  const firstError = errors.title || errors.content
+  if (firstError) return toast.error(firstError)
   submitting.value = true
   try {
     await feedbackApi.submit({
@@ -54,11 +64,26 @@ async function submit() {
       </div>
       <div>
         <label class="label">标题</label>
-        <input v-model="form.title" class="input" placeholder="简要描述问题或建议" />
+        <input
+          v-model="form.title"
+          class="input"
+          :class="{ 'input-error': errors.title }"
+          placeholder="简要描述问题或建议"
+          @input="validateField('title')"
+        />
+        <p v-if="errors.title" class="field-error">{{ errors.title }}</p>
       </div>
       <div>
         <label class="label">内容</label>
-        <textarea v-model="form.content" class="input resize-none" rows="5" placeholder="详细描述你的问题或建议" />
+        <textarea
+          v-model="form.content"
+          class="input resize-none"
+          :class="{ 'input-error': errors.content }"
+          rows="5"
+          placeholder="详细描述你的问题或建议"
+          @input="validateField('content')"
+        />
+        <p v-if="errors.content" class="field-error">{{ errors.content }}</p>
       </div>
       <div>
         <label class="label">联系方式（可选）</label>

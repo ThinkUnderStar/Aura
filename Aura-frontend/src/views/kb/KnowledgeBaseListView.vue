@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { kbApi } from '@/api'
 import { toast } from '@/stores/toast'
+import { required } from '@/utils/validate'
 import type { KnowledgeBase } from '@/types'
 import { formatTime, initialOf } from '@/utils/format'
 import AppIcon from '@/components/ui/AppIcon.vue'
@@ -30,6 +31,31 @@ const creating = ref(false)
 const renaming = ref<KnowledgeBase | null>(null)
 const renameForm = ref({ name: '', description: '' })
 const renamingBusy = ref(false)
+
+// 实时校验：名称/描述后端仅要求非空 + 敏感词（敏感词无法前端校验，此处仅内联非空）
+const errors = reactive<Record<string, string>>({
+  createName: '',
+  createDesc: '',
+  renameName: '',
+  renameDesc: '',
+})
+
+function validateField(field: 'createName' | 'createDesc' | 'renameName' | 'renameDesc') {
+  switch (field) {
+    case 'createName':
+      errors.createName = required(createForm.value.name.trim(), '请输入知识库名称') ?? ''
+      break
+    case 'createDesc':
+      errors.createDesc = required(createForm.value.description.trim(), '请输入知识库描述') ?? ''
+      break
+    case 'renameName':
+      errors.renameName = required(renameForm.value.name.trim(), '名称不能为空') ?? ''
+      break
+    case 'renameDesc':
+      errors.renameDesc = required(renameForm.value.description.trim(), '请输入知识库描述') ?? ''
+      break
+  }
+}
 
 const deleting = ref<KnowledgeBase | null>(null)
 const deletingBusy = ref(false)
@@ -86,10 +112,10 @@ function daysLeft(kb: KnowledgeBase): number {
 }
 
 async function create() {
+  ;(['createName', 'createDesc'] as const).forEach(validateField)
+  if (errors.createName || errors.createDesc) return toast.error(errors.createName || errors.createDesc)
   const name = createForm.value.name.trim()
   const description = createForm.value.description.trim()
-  if (!name) return toast.error('请输入知识库名称')
-  if (!description) return toast.error('请输入知识库描述')
   creating.value = true
   try {
     await kbApi.create({
@@ -99,6 +125,8 @@ async function create() {
     })
     showCreate.value = false
     createForm.value = { name: '', description: '' }
+    errors.createName = ''
+    errors.createDesc = ''
     toast.success('已创建')
     await load()
   } catch {
@@ -111,14 +139,16 @@ async function create() {
 function openRename(kb: KnowledgeBase) {
   renaming.value = kb
   renameForm.value = { name: kb.name, description: kb.description ?? '' }
+  errors.renameName = ''
+  errors.renameDesc = ''
 }
 
 async function saveRename() {
   if (!renaming.value) return
+  ;(['renameName', 'renameDesc'] as const).forEach(validateField)
+  if (errors.renameName || errors.renameDesc) return toast.error(errors.renameName || errors.renameDesc)
   const name = renameForm.value.name.trim()
   const description = renameForm.value.description.trim()
-  if (!name) return toast.error('名称不能为空')
-  if (!description) return toast.error('请输入知识库描述')
 
   // 后端一次仅允许修改 name 或 description 之一（type 指定），按变更项分别提交
   const nameChanged = name !== renaming.value.name
@@ -354,11 +384,26 @@ onMounted(load)
       <div class="space-y-4">
         <div>
           <label class="label">名称</label>
-          <input v-model="createForm.name" class="input" placeholder="例如：产品文档" />
+          <input
+            v-model="createForm.name"
+            class="input"
+            :class="{ 'input-error': errors.createName }"
+            placeholder="例如：产品文档"
+            @input="validateField('createName')"
+          />
+          <p v-if="errors.createName" class="field-error">{{ errors.createName }}</p>
         </div>
         <div>
           <label class="label">描述</label>
-          <textarea v-model="createForm.description" class="input resize-none" rows="3" placeholder="简要说明知识库用途（必填）" />
+          <textarea
+            v-model="createForm.description"
+            class="input resize-none"
+            :class="{ 'input-error': errors.createDesc }"
+            rows="3"
+            placeholder="简要说明知识库用途（必填）"
+            @input="validateField('createDesc')"
+          />
+          <p v-if="errors.createDesc" class="field-error">{{ errors.createDesc }}</p>
         </div>
       </div>
       <div class="mt-5 flex justify-end gap-2">
@@ -375,11 +420,24 @@ onMounted(load)
       <div class="space-y-4">
         <div>
           <label class="label">名称</label>
-          <input v-model="renameForm.name" class="input" />
+          <input
+            v-model="renameForm.name"
+            class="input"
+            :class="{ 'input-error': errors.renameName }"
+            @input="validateField('renameName')"
+          />
+          <p v-if="errors.renameName" class="field-error">{{ errors.renameName }}</p>
         </div>
         <div>
           <label class="label">描述</label>
-          <textarea v-model="renameForm.description" class="input resize-none" rows="3" />
+          <textarea
+            v-model="renameForm.description"
+            class="input resize-none"
+            :class="{ 'input-error': errors.renameDesc }"
+            rows="3"
+            @input="validateField('renameDesc')"
+          />
+          <p v-if="errors.renameDesc" class="field-error">{{ errors.renameDesc }}</p>
         </div>
       </div>
       <div class="mt-5 flex justify-end gap-2">

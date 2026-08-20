@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { reportApi } from '@/api'
 import { toast } from '@/stores/toast'
+import { required } from '@/utils/validate'
 import { REPORT_REASON } from '@/constants/enums'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppModal from '@/components/ui/AppModal.vue'
@@ -21,6 +22,9 @@ const reason = ref('')
 const description = ref('')
 const submitting = ref(false)
 
+// 实时校验：举报原因/描述后端仅要求非空 + 枚举（枚举由上方按钮限定）
+const errors = reactive<Record<string, string>>({ reason: '', description: '' })
+
 // 每次打开时重置表单
 watch(
   () => props.open,
@@ -28,13 +32,21 @@ watch(
     if (open) {
       reason.value = ''
       description.value = ''
+      errors.reason = ''
+      errors.description = ''
     }
   },
 )
 
+function validateField(field: 'reason' | 'description') {
+  if (field === 'reason') errors.reason = required(reason.value, '请选择举报原因') ?? ''
+  else errors.description = required(description.value.trim(), '请填写举报描述') ?? ''
+}
+
 async function submit() {
-  if (!reason.value) return toast.error('请选择举报原因')
-  if (!description.value.trim()) return toast.error('请填写举报描述')
+  ;(['reason', 'description'] as const).forEach(validateField)
+  const firstError = errors.reason || errors.description
+  if (firstError) return toast.error(firstError)
   submitting.value = true
   try {
     await reportApi.submit({
@@ -64,15 +76,24 @@ async function submit() {
             :key="key"
             class="rounded-sm px-3 py-1.5 text-sm transition-colors"
             :class="reason === key ? 'bg-ink-solid text-white' : 'text-muted hover:bg-surface-muted hover:text-ink'"
-            @click="reason = key"
+            @click="reason = key; validateField('reason')"
           >
             {{ label }}
           </button>
         </div>
+        <p v-if="errors.reason" class="field-error">{{ errors.reason }}</p>
       </div>
       <div>
         <label class="label">举报描述</label>
-        <textarea v-model="description" class="input resize-none" rows="4" placeholder="请详细描述举报原因，便于管理员审核" />
+        <textarea
+          v-model="description"
+          class="input resize-none"
+          :class="{ 'input-error': errors.description }"
+          rows="4"
+          placeholder="请详细描述举报原因，便于管理员审核"
+          @input="validateField('description')"
+        />
+        <p v-if="errors.description" class="field-error">{{ errors.description }}</p>
       </div>
     </div>
     <div class="mt-5 flex items-center justify-between gap-2">

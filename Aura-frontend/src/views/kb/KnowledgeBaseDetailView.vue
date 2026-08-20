@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { docApi, kbApi } from '@/api'
 import { http } from '@/api/http'
 import { toast } from '@/stores/toast'
+import { required, validateDocumentFile } from '@/utils/validate'
 import type { Document, KnowledgeBase } from '@/types'
 import { DOC_STATUS } from '@/constants/enums'
 import { formatSize, formatTime } from '@/utils/format'
@@ -32,6 +33,14 @@ const uploading = ref(false)
 const showEdit = ref(false)
 const editForm = ref({ name: '', description: '' })
 const saving = ref(false)
+
+// 实时校验：名称/描述后端仅要求非空 + 敏感词（敏感词无法前端校验，此处仅内联非空）
+const errors = reactive<Record<string, string>>({ name: '', description: '' })
+
+function validateField(field: 'name' | 'description') {
+  if (field === 'name') errors.name = required(editForm.value.name.trim(), '名称不能为空') ?? ''
+  else errors.description = required(editForm.value.description.trim(), '请输入知识库描述') ?? ''
+}
 
 const deleting = ref<Document | null>(null)
 const deletingBusy = ref(false)
@@ -74,11 +83,11 @@ async function loadDocs() {
 async function saveEdit() {
   const kbInfo = kb.value
   if (!kbInfo) return
+  validateField('name')
+  validateField('description')
+  if (errors.name || errors.description) return toast.error(errors.name || errors.description)
   const name = editForm.value.name.trim()
   const description = editForm.value.description.trim()
-  if (!name) return toast.error('名称不能为空')
-  // 描述必填：团队知识库编辑时不显示描述字段，仅个人知识库校验
-  if (kbInfo.isTeam !== 1 && !description) return toast.error('请输入知识库描述')
 
   // 后端一次仅允许修改 name 或 description 之一（type 指定），按变更项分别提交
   const nameChanged = name !== kbInfo.name
@@ -88,20 +97,14 @@ async function saveEdit() {
     return
   }
 
+  const update = kbInfo.isTeam === 1 ? kbApi.updateTeam : kbApi.updateMy
   saving.value = true
   try {
-    if (kbInfo.isTeam === 1) {
-      // 团队知识库：编辑表单仅含名称（描述字段不展示），只提交名称变更
-      if (nameChanged) {
-        await kbApi.updateTeam({ kbId: kbId.value, type: 'name', name })
-      }
-    } else {
-      if (nameChanged) {
-        await kbApi.updateMy({ kbId: kbId.value, type: 'name', name })
-      }
-      if (descChanged) {
-        await kbApi.updateMy({ kbId: kbId.value, type: 'description', description })
-      }
+    if (nameChanged) {
+      await update({ kbId: kbId.value, type: 'name', name })
+    }
+    if (descChanged) {
+      await update({ kbId: kbId.value, type: 'description', description })
     }
     toast.success('已保存')
     showEdit.value = false
@@ -117,9 +120,22 @@ async function onFiles(e: Event) {
   const input = e.target as HTMLInputElement
   const files = input.files
   if (!files?.length) return
+  // 前端预检：扩展名与大小（与后端 SysDocumentServiceImpl 规则一致），不合规文件不发送请求
+  const valid = Array.from(files).filter((file) => {
+    const err = validateDocumentFile(file)
+    if (err) {
+      toast.error(`${file.name}：${err}`)
+      return false
+    }
+    return true
+  })
+  if (!valid.length) {
+    input.value = ''
+    return
+  }
   uploading.value = true
   try {
-    for (const file of Array.from(files)) {
+    for (const file of valid) {
       await docApi.upload(file, kbId.value)
     }
     toast.success('上传完成，正在索引')
@@ -203,7 +219,7 @@ onMounted(() => {
           </div>
         </div>
         <div class="flex items-center gap-2">
-          <button class="btn-secondary" @click="showEdit = true">
+          <button class="btn-secondary" @click="showEdit = true; errors.name = ''; errors.description = ''">
             <AppIcon name="edit" :size="15" />
             编辑
           </button>
@@ -297,11 +313,24 @@ onMounted(() => {
       <div class="space-y-4">
         <div>
           <label class="label">名称</label>
-          <input v-model="editForm.name" class="input" />
+          <input
+            v-model="editForm.name"
+            class="input"
+            :class="{ 'input-error': errors.name }"
+            @input="validateField('name')"
+          />
+          <p v-if="errors.name" class="field-error">{{ errors.name }}</p>
         </div>
-        <div v-if="kb?.isTeam !== 1">
+        <div>
           <label class="label">描述</label>
-          <textarea v-model="editForm.description" class="input resize-none" rows="3" />
+          <textarea
+            v-model="editForm.description"
+            class="input resize-none"
+            :class="{ 'input-error': errors.description }"
+            rows="3"
+            @input="validateField('description')"
+          />
+          <p v-if="errors.description" class="field-error">{{ errors.description }}</p>
         </div>
       </div>
       <div class="mt-5 flex justify-end gap-2">

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { agentApi, kbApi, wsApi } from '@/api'
 import { toast } from '@/stores/toast'
+import { validateAgentName } from '@/utils/validate'
 import type { Agent, KnowledgeBase } from '@/types'
 
 /** 可绑定知识库：团队知识库额外携带其所属团队 id，用于还原已绑定状态 */
@@ -27,6 +28,14 @@ const renaming = ref<Agent | null>(null)
 const renameValue = ref('')
 const renamingBusy = ref(false)
 
+// 实时格式校验：与后端 ValidateUtils.agentNameValidate 规则一致
+const errors = reactive<Record<string, string>>({ createName: '', renameName: '' })
+
+function validateName(field: 'createName' | 'renameName') {
+  const v = field === 'createName' ? newName.value : renameValue.value
+  errors[field] = validateAgentName(v) ?? ''
+}
+
 const deleting = ref<Agent | null>(null)
 const deletingBusy = ref(false)
 
@@ -49,13 +58,15 @@ async function load() {
 }
 
 async function create() {
+  validateName('createName')
+  if (errors.createName) return toast.error(errors.createName)
   const name = newName.value.trim()
-  if (!name) return toast.error('请输入智能体名称')
   creating.value = true
   try {
     await agentApi.create(name)
     showCreate.value = false
     newName.value = ''
+    errors.createName = ''
     toast.success('已创建')
     await load()
   } catch {
@@ -68,12 +79,14 @@ async function create() {
 function openRename(agent: Agent) {
   renaming.value = agent
   renameValue.value = agent.name
+  errors.renameName = ''
 }
 
 async function saveRename() {
   if (!renaming.value) return
+  validateName('renameName')
+  if (errors.renameName) return toast.error(errors.renameName)
   const name = renameValue.value.trim()
-  if (!name) return toast.error('名称不能为空')
   renamingBusy.value = true
   try {
     await agentApi.update(renaming.value.id, name)
@@ -253,7 +266,15 @@ onMounted(load)
     <!-- 新建 -->
     <AppModal :open="showCreate" title="新建智能体" @close="showCreate = false">
       <label class="label">名称</label>
-      <input v-model="newName" class="input" placeholder="例如：写作助手" @keydown.enter="create" />
+      <input
+        v-model="newName"
+        class="input"
+        :class="{ 'input-error': errors.createName }"
+        placeholder="例如：写作助手"
+        @input="validateName('createName')"
+        @keydown.enter="create"
+      />
+      <p v-if="errors.createName" class="field-error">{{ errors.createName }}</p>
       <div class="mt-5 flex justify-end gap-2">
         <button class="btn-secondary" @click="showCreate = false">取消</button>
         <button class="btn-primary" :disabled="creating" @click="create">
@@ -266,7 +287,14 @@ onMounted(load)
     <!-- 重命名 -->
     <AppModal :open="!!renaming" title="重命名智能体" @close="renaming = null">
       <label class="label">名称</label>
-      <input v-model="renameValue" class="input" @keydown.enter="saveRename" />
+      <input
+        v-model="renameValue"
+        class="input"
+        :class="{ 'input-error': errors.renameName }"
+        @input="validateName('renameName')"
+        @keydown.enter="saveRename"
+      />
+      <p v-if="errors.renameName" class="field-error">{{ errors.renameName }}</p>
       <div class="mt-5 flex justify-end gap-2">
         <button class="btn-secondary" @click="renaming = null">取消</button>
         <button class="btn-primary" :disabled="renamingBusy" @click="saveRename">保存</button>

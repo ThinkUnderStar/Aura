@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { memberApi, wsApi } from '@/api'
 import { toast } from '@/stores/toast'
+import { required } from '@/utils/validate'
 import type { WorkspaceVO } from '@/types'
 import { MEMBER_ROLE, WS_STATUS } from '@/constants/enums'
 import { formatTime, initialOf } from '@/utils/format'
@@ -27,6 +28,26 @@ const creating = ref(false)
 const showJoin = ref(false)
 const inviteCode = ref('')
 const joining = ref(false)
+
+// 实时校验：团队名/知识库名/描述后端仅要求非空 + 敏感词（敏感词无法前端校验，此处仅内联非空）
+const errors = reactive<Record<string, string>>({ name: '', kbName: '', kbDescription: '', inviteCode: '' })
+
+function validateField(field: 'name' | 'kbName' | 'kbDescription' | 'inviteCode') {
+  switch (field) {
+    case 'name':
+      errors.name = required(createForm.value.name.trim(), '请输入团队名称') ?? ''
+      break
+    case 'kbName':
+      errors.kbName = required(createForm.value.kbName.trim(), '请输入团队知识库名称') ?? ''
+      break
+    case 'kbDescription':
+      errors.kbDescription = required(createForm.value.kbDescription.trim(), '请输入团队知识库描述') ?? ''
+      break
+    case 'inviteCode':
+      errors.inviteCode = required(inviteCode.value.trim(), '请输入邀请码') ?? ''
+      break
+  }
+}
 
 // 已解散/已封禁/被移出的团队：点卡片不进入详情，弹确认框决定是否清除记录
 const clearing = ref<WorkspaceVO | null>(null)
@@ -68,12 +89,12 @@ function clearSearch() {
 }
 
 async function create() {
+  ;(['name', 'kbName', 'kbDescription'] as const).forEach(validateField)
+  const firstError = errors.name || errors.kbName || errors.kbDescription
+  if (firstError) return toast.error(firstError)
   const name = createForm.value.name.trim()
-  if (!name) return toast.error('请输入团队名称')
   const kbName = createForm.value.kbName.trim()
-  if (!kbName) return toast.error('请输入团队知识库名称')
   const kbDescription = createForm.value.kbDescription.trim()
-  if (!kbDescription) return toast.error('请输入团队知识库描述')
   creating.value = true
   try {
     await wsApi.create({
@@ -84,6 +105,9 @@ async function create() {
     })
     showCreate.value = false
     createForm.value = { name: '', description: '', kbName: '', kbDescription: '' }
+    errors.name = ''
+    errors.kbName = ''
+    errors.kbDescription = ''
     toast.success('已创建')
     await load()
   } catch {
@@ -94,13 +118,15 @@ async function create() {
 }
 
 async function join() {
+  validateField('inviteCode')
+  if (errors.inviteCode) return toast.error(errors.inviteCode)
   const code = inviteCode.value.trim()
-  if (!code) return toast.error('请输入邀请码')
   joining.value = true
   try {
     await memberApi.join(code)
     showJoin.value = false
     inviteCode.value = ''
+    errors.inviteCode = ''
     toast.success('已加入团队')
     await load()
   } catch {
@@ -264,7 +290,14 @@ onMounted(load)
       <div class="space-y-4">
         <div>
           <label class="label">名称</label>
-          <input v-model="createForm.name" class="input" placeholder="例如：产品研发组" />
+          <input
+            v-model="createForm.name"
+            class="input"
+            :class="{ 'input-error': errors.name }"
+            placeholder="例如：产品研发组"
+            @input="validateField('name')"
+          />
+          <p v-if="errors.name" class="field-error">{{ errors.name }}</p>
         </div>
         <div>
           <label class="label">描述（可选）</label>
@@ -272,11 +305,26 @@ onMounted(load)
         </div>
         <div>
           <label class="label">团队知识库名称</label>
-          <input v-model="createForm.kbName" class="input" placeholder="例如：产品研发知识库" />
+          <input
+            v-model="createForm.kbName"
+            class="input"
+            :class="{ 'input-error': errors.kbName }"
+            placeholder="例如：产品研发知识库"
+            @input="validateField('kbName')"
+          />
+          <p v-if="errors.kbName" class="field-error">{{ errors.kbName }}</p>
         </div>
         <div>
           <label class="label">团队知识库描述</label>
-          <textarea v-model="createForm.kbDescription" class="input resize-none" rows="2" placeholder="简要说明知识库用途" />
+          <textarea
+            v-model="createForm.kbDescription"
+            class="input resize-none"
+            :class="{ 'input-error': errors.kbDescription }"
+            rows="2"
+            placeholder="简要说明知识库用途"
+            @input="validateField('kbDescription')"
+          />
+          <p v-if="errors.kbDescription" class="field-error">{{ errors.kbDescription }}</p>
         </div>
       </div>
       <div class="mt-5 flex justify-end gap-2">
@@ -291,7 +339,15 @@ onMounted(load)
     <!-- 加入 -->
     <AppModal :open="showJoin" title="加入团队" @close="showJoin = false">
       <label class="label">邀请码</label>
-      <input v-model="inviteCode" class="input" placeholder="输入团队邀请码" @keydown.enter="join" />
+      <input
+        v-model="inviteCode"
+        class="input"
+        :class="{ 'input-error': errors.inviteCode }"
+        placeholder="输入团队邀请码"
+        @input="validateField('inviteCode')"
+        @keydown.enter="join"
+      />
+      <p v-if="errors.inviteCode" class="field-error">{{ errors.inviteCode }}</p>
       <div class="mt-5 flex justify-end gap-2">
         <button class="btn-secondary" @click="showJoin = false">取消</button>
         <button class="btn-primary" :disabled="joining" @click="join">加入</button>
