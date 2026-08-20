@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useThemeStore } from '@/stores/theme'
 import { authApi } from '@/api'
 import { toast } from '@/stores/toast'
+import { validatePhone, validateUsername, validatePassword } from '@/utils/validate'
 import { resolveAuraLogo } from '@/utils/auraLogo'
 import AppIcon from '@/components/ui/AppIcon.vue'
 
@@ -18,6 +19,37 @@ const loading = ref(false)
 const sending = ref(false)
 const countdown = ref(0)
 
+// 实时格式校验：与后端 ValidateUtils / AuthServiceImpl 规则一致
+const errors = reactive<Record<string, string>>({
+  username: '',
+  phone: '',
+  password: '',
+  repeatPassword: '',
+  code: '',
+})
+
+function validateField(field: 'username' | 'phone' | 'password' | 'repeatPassword' | 'code') {
+  switch (field) {
+    case 'username':
+      errors.username = validateUsername(form.username) ?? ''
+      break
+    case 'phone':
+      errors.phone = validatePhone(form.phone) ?? ''
+      break
+    case 'password':
+      errors.password = validatePassword(form.password) ?? ''
+      // 密码变化时同步重新校验确认密码
+      errors.repeatPassword = form.repeatPassword !== form.password ? '两次输入的密码不一致' : ''
+      break
+    case 'repeatPassword':
+      errors.repeatPassword = form.repeatPassword !== form.password ? '两次输入的密码不一致' : ''
+      break
+    case 'code':
+      errors.code = form.code ? '' : '请输入验证码'
+      break
+  }
+}
+
 function startCountdown() {
   countdown.value = 60
   const t = setInterval(() => {
@@ -27,7 +59,8 @@ function startCountdown() {
 }
 
 async function sendCode() {
-  if (!form.phone) return toast.error('请先输入手机号')
+  validateField('phone')
+  if (errors.phone) return toast.error(errors.phone)
   sending.value = true
   try {
     await authApi.sendCode(form.phone, 'register')
@@ -41,12 +74,9 @@ async function sendCode() {
 }
 
 async function submit() {
-  if (!form.username) return toast.error('请输入用户名')
-  if (!form.phone) return toast.error('请输入手机号')
-  if (!form.password) return toast.error('请输入密码')
-  if (form.password.length < 6) return toast.error('密码至少 6 位')
-  if (form.password !== form.repeatPassword) return toast.error('两次输入的密码不一致')
-  if (!form.code) return toast.error('请输入验证码')
+  ;(['username', 'phone', 'password', 'repeatPassword', 'code'] as const).forEach(validateField)
+  const firstError = Object.values(errors).find(Boolean)
+  if (firstError) return toast.error(firstError)
 
   loading.value = true
   try {
@@ -76,12 +106,28 @@ async function submit() {
         <form class="space-y-4" @submit.prevent="submit">
           <div>
             <label class="label">用户名</label>
-            <input v-model="form.username" class="input" placeholder="用于登录的用户名" autocomplete="username" />
+            <input
+              v-model="form.username"
+              class="input"
+              :class="{ 'input-error': errors.username }"
+              placeholder="4~16 位，字母开头，仅字母/数字/下划线"
+              autocomplete="username"
+              @input="validateField('username')"
+            />
+            <p v-if="errors.username" class="field-error">{{ errors.username }}</p>
           </div>
 
           <div>
             <label class="label">手机号</label>
-            <input v-model="form.phone" class="input" placeholder="请输入手机号" autocomplete="tel" />
+            <input
+              v-model="form.phone"
+              class="input"
+              :class="{ 'input-error': errors.phone }"
+              placeholder="请输入手机号"
+              autocomplete="tel"
+              @input="validateField('phone')"
+            />
+            <p v-if="errors.phone" class="field-error">{{ errors.phone }}</p>
           </div>
 
           <div>
@@ -90,9 +136,11 @@ async function submit() {
               <input
                 v-model="form.password"
                 class="input pr-10"
+                :class="{ 'input-error': errors.password }"
                 :type="showPwd ? 'text' : 'password'"
-                placeholder="至少 6 位"
+                placeholder="8~20 位，须含字母和数字"
                 autocomplete="new-password"
+                @input="validateField('password')"
               />
               <button
                 type="button"
@@ -102,6 +150,7 @@ async function submit() {
                 <AppIcon :name="showPwd ? 'eye' : 'lock'" :size="16" />
               </button>
             </div>
+            <p v-if="errors.password" class="field-error">{{ errors.password }}</p>
           </div>
 
           <div>
@@ -109,16 +158,25 @@ async function submit() {
             <input
               v-model="form.repeatPassword"
               class="input"
+              :class="{ 'input-error': errors.repeatPassword }"
               type="password"
               placeholder="再次输入密码"
               autocomplete="new-password"
+              @input="validateField('repeatPassword')"
             />
+            <p v-if="errors.repeatPassword" class="field-error">{{ errors.repeatPassword }}</p>
           </div>
 
           <div>
             <label class="label">验证码</label>
             <div class="flex gap-2">
-              <input v-model="form.code" class="input flex-1" placeholder="短信验证码" />
+              <input
+                v-model="form.code"
+                class="input flex-1"
+                :class="{ 'input-error': errors.code }"
+                placeholder="短信验证码"
+                @input="validateField('code')"
+              />
               <button
                 type="button"
                 class="btn-secondary shrink-0"
@@ -128,6 +186,7 @@ async function submit() {
                 {{ countdown > 0 ? `${countdown}s` : '获取验证码' }}
               </button>
             </div>
+            <p v-if="errors.code" class="field-error">{{ errors.code }}</p>
           </div>
 
           <button type="submit" class="btn-primary w-full !py-2.5" :disabled="loading">

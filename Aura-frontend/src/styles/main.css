@@ -118,4 +118,14 @@ body {
   .label {
     @apply mb-1.5 block text-xs font-medium text-muted;
   }
+
+  /* 非法输入的红边框（配合实时格式校验）；red-* 均为 CSS 变量色，不能用 /opacity 修饰 */
+  .input-error {
+    @apply border-red-text focus:border-red-text focus:ring-2 focus:ring-red-bg;
+  }
+
+  /* 字段下方的内联错误文案 */
+  .field-error {
+    @apply mt-1 text-xs text-red-text;
+  }
 }

@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { authApi, userApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { useAvatarGenStore } from '@/stores/avatarGen'
 import { toast } from '@/stores/toast'
+import { validateEmail, validateImageFile, validateUsername } from '@/utils/validate'
 import { assetUrl } from '@/utils/asset'
 import { desensitizeEmail } from '@/utils/format'
 import AppIcon from '@/components/ui/AppIcon.vue'
@@ -18,6 +19,14 @@ const auth = useAuthStore()
 
 const form = ref({ username: '', email: '' })
 const emailCode = ref('')
+// 实时格式校验：与后端 ValidateUtils 规则一致
+const errors = reactive<Record<string, string>>({ username: '', email: '' })
+
+function validateField(field: 'username' | 'email') {
+  if (field === 'username') errors.username = validateUsername(form.value.username) ?? ''
+  else errors.email = validateEmail(form.value.email) ?? ''
+}
+
 const savingUsername = ref(false)
 const sendingCode = ref(false)
 const savingEmail = ref(false)
@@ -43,17 +52,22 @@ const editing = ref(false)
 function startEdit() {
   syncForm()
   emailCode.value = ''
+  errors.username = ''
+  errors.email = ''
   editing.value = true
 }
 
 function cancelEdit() {
   editing.value = false
   emailCode.value = ''
+  errors.username = ''
+  errors.email = ''
 }
 
 async function saveUsername() {
+  validateField('username')
+  if (errors.username) return toast.error(errors.username)
   const username = form.value.username.trim()
-  if (!username) return toast.error('用户名不能为空')
   savingUsername.value = true
   try {
     await userApi.updateUsername(username)
@@ -67,8 +81,9 @@ async function saveUsername() {
 }
 
 async function sendEmailCode() {
+  validateField('email')
+  if (errors.email) return toast.error(errors.email)
   const email = form.value.email.trim()
-  if (!email) return toast.error('请先填写邮箱')
   sendingCode.value = true
   try {
     await authApi.sendCode(email, 'reset')
@@ -81,9 +96,10 @@ async function sendEmailCode() {
 }
 
 async function saveEmail() {
+  validateField('email')
+  if (errors.email) return toast.error(errors.email)
   const email = form.value.email.trim()
   const code = emailCode.value.trim()
-  if (!email) return toast.error('请先填写邮箱')
   if (!code) return toast.error('请输入邮箱验证码')
   savingEmail.value = true
   try {
@@ -103,6 +119,12 @@ async function onAvatar(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
+  const err = validateImageFile(file)
+  if (err) {
+    toast.error(err)
+    input.value = ''
+    return
+  }
   uploadingAvatar.value = true
   try {
     const { data } = await userApi.uploadAvatar(file)
@@ -266,21 +288,34 @@ async function deleteAccount() {
         <div>
           <label class="label">用户名</label>
           <div class="flex gap-2">
-            <input v-model="form.username" class="input flex-1" />
+            <input
+              v-model="form.username"
+              class="input flex-1"
+              :class="{ 'input-error': errors.username }"
+              @input="validateField('username')"
+            />
             <button class="btn-secondary shrink-0" :disabled="savingUsername" @click="saveUsername">
               <AppIcon v-if="savingUsername" name="refresh" :size="14" class="animate-spin" />
               保存
             </button>
           </div>
+          <p v-if="errors.username" class="field-error">{{ errors.username }}</p>
         </div>
         <div>
           <label class="label">邮箱</label>
           <div class="flex gap-2">
-            <input v-model="form.email" class="input flex-1" placeholder="绑定邮箱" />
+            <input
+              v-model="form.email"
+              class="input flex-1"
+              :class="{ 'input-error': errors.email }"
+              placeholder="绑定邮箱"
+              @input="validateField('email')"
+            />
             <button class="btn-secondary shrink-0" :disabled="sendingCode" @click="sendEmailCode">
               {{ sendingCode ? '发送中…' : '发送验证码' }}
             </button>
           </div>
+          <p v-if="errors.email" class="field-error">{{ errors.email }}</p>
           <div class="mt-2 flex gap-2">
             <input v-model="emailCode" class="input flex-1" placeholder="邮箱验证码" />
             <button class="btn-primary shrink-0" :disabled="savingEmail" @click="saveEmail">

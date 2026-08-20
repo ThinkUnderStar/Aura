@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { kbApi, logApi, memberApi, wsApi } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { toast } from '@/stores/toast'
+import { required, validateImageFile } from '@/utils/validate'
 import type { KnowledgeBase, OperationLog, WorkspaceMemberVO, WorkspaceVO } from '@/types'
 import { MEMBER_ROLE, WS_STATUS } from '@/constants/enums'
 import { formatTime } from '@/utils/format'
@@ -36,6 +37,13 @@ const showEdit = ref(false)
 const editForm = ref({ name: '', description: '' })
 const saving = ref(false)
 const logoInput = ref<HTMLInputElement | null>(null)
+
+// 实时校验：团队名后端仅要求非空 + 敏感词（敏感词无法前端校验，此处仅内联非空）
+const errors = reactive<Record<string, string>>({ name: '' })
+
+function validateField(field: 'name') {
+  if (field === 'name') errors.name = required(editForm.value.name.trim(), '名称不能为空') ?? ''
+}
 const showReport = ref(false)
 
 const confirm = ref<null | { title: string; message: string; danger?: boolean; action: () => Promise<void> }>(null)
@@ -152,13 +160,15 @@ function openEdit() {
   if (workspace.value) {
     editForm.value = { name: workspace.value.name, description: workspace.value.description ?? '' }
   }
+  errors.name = ''
   showEdit.value = true
 }
 
 async function saveEdit() {
   if (!workspace.value) return
+  validateField('name')
+  if (errors.name) return toast.error(errors.name)
   const name = editForm.value.name.trim()
-  if (!name) return toast.error('名称不能为空')
   const description = editForm.value.description.trim()
 
   // 后端一次仅允许修改 name 或 description 之一（type 指定），按变更项分别提交
@@ -192,6 +202,12 @@ async function onLogo(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
+  const err = validateImageFile(file)
+  if (err) {
+    toast.error(err)
+    input.value = ''
+    return
+  }
   try {
     await wsApi.uploadLogo(wsId.value, file)
     toast.success('Logo 已更新')
@@ -445,7 +461,13 @@ onMounted(() => {
       <div class="space-y-4">
         <div>
           <label class="label">名称</label>
-          <input v-model="editForm.name" class="input" />
+          <input
+            v-model="editForm.name"
+            class="input"
+            :class="{ 'input-error': errors.name }"
+            @input="validateField('name')"
+          />
+          <p v-if="errors.name" class="field-error">{{ errors.name }}</p>
         </div>
         <div>
           <label class="label">描述</label>
