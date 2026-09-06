@@ -30,7 +30,8 @@ public class SaTokenConfig implements WebMvcConfigurer {
                 .excludePathPatterns(
                         "/auth/login",
                         "/auth/code",
-                        "/auth/register/user"
+                        "/auth/register/user",
+                        "/captcha/get"
                 );
     }
 }

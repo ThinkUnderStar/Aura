@@ -9,6 +9,7 @@ public class ValidateUtils {
     private static final String PHONE_REGEX = "^1[3-9]\\d{9}$";
     private static final String EMAIL_REGEX = "^[a-zA-Z0-9_.-]+@[a-zA-Z0-9-]+(\\.[a-zA-Z0-9]+)*\\.[a-zA-Z0-9]{2,6}$";
     private static final String AGENT_NAME_REGEX = "^[\\u4e00-\\u9fa5a-zA-Z0-9_\\-\\s]{1,20}$";
+    private static final String UUID_REGEX = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
 
     /**
      * Agent 名称规范验证
@@ -64,5 +65,15 @@ public class ValidateUtils {
      */
     public static boolean emailValidate(String email){
         return email != null && email.matches(EMAIL_REGEX);
+    }
+
+    /**
+     * UUID 格式验证（人机验证临时 key）
+     * 标准 8-4-4-4-12 的十六进制 + 连字符，与前端 crypto.randomUUID() 生成结果一致
+     * @param uuid 待校验的 UUID 字符串
+     * @return 是否合法
+     */
+    public static boolean uuidValidate(String uuid){
+        return uuid != null && uuid.matches(UUID_REGEX);
     }
 }

@@ -33,6 +33,8 @@ export const useAuthStore = defineStore('auth', () => {
     code?: string
     loginWay: number
     isRemember: boolean
+    captchaCode?: string
+    captchaKey?: string
   }) {
     const { data } = await authApi.login(payload)
     if (data.code !== 200) throw new Error(data.msg)

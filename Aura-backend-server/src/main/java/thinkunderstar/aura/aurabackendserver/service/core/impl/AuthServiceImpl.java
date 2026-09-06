@@ -288,6 +288,24 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException("用户名格式有问题");
         }
 
+        //人机验证相关参数审查
+        if (
+                loginDto.getCaptchaCode() == null
+                        || loginDto.getCaptchaCode().isEmpty()
+                        || !ValidateUtils.uuidValidate(loginDto.getCaptchaKey())
+        ) {
+            throw new BusinessException("人机验证相关参数接收异常");
+        }
+
+        //人机验证码验证（空值安全：key 不存在或已过期时不走 .equals，避免 NPE）
+        String captchaStoreCode = redisUtils.get(loginDto.getCaptchaKey());
+        if (captchaStoreCode == null || !loginDto.getCaptchaCode().equals(captchaStoreCode)) {
+            throw new BusinessException("人机验证码错误或已过期");
+        }
+
+        //校验通过后删除，保证验证码一次性有效
+        redisUtils.delete(loginDto.getCaptchaKey());
+
         boolean right = redisTokenBucketLimiter.tryAcquireByIp(IpUtils.getClientIp(httpServletRequest), 5, 2);
 
         if(!right){
