@@ -19,8 +19,15 @@ import type {
 
 // ============ 认证 ============
 export const authApi = {
-  login: (data: { username: string; password?: string; code?: string; loginWay: number; isRemember: boolean }) =>
-    http.post<Result<UserVO>>('/auth/login', data),
+  login: (data: {
+    username: string
+    password?: string
+    code?: string
+    loginWay: number
+    isRemember: boolean
+    captchaCode?: string
+    captchaKey?: string
+  }) => http.post<Result<UserVO>>('/auth/login', data),
   sendCode: (username: string, way: 'login' | 'register' | 'reset') =>
     http.post<Result<void>>('/auth/code', null, { params: { username, way } }),
   register: (data: { username: string; password: string; repeatPassword: string; phone: string; code: string }) =>

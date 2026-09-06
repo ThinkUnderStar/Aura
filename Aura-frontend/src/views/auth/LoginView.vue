@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useNotificationStore } from '@/stores/notification'
 import { useThemeStore } from '@/stores/theme'
 import { authApi } from '@/api'
+import { API_BASE } from '@/api/config'
 import { toast } from '@/stores/toast'
 import { validateLoginAccount } from '@/utils/validate'
 import { resolveAuraLogo } from '@/utils/auraLogo'
@@ -25,6 +26,27 @@ const remember = ref(true)
 const loading = ref(false)
 const sending = ref(false)
 const countdown = ref(0)
+
+// 人机验证码（两种登录方式共用，后端每次登录都必须携带）
+const captchaKey = ref('')
+const captchaCode = ref('')
+const captchaUrl = ref('')
+const captchaError = ref(false)
+
+// 拉取/刷新图形验证码：每次换新 uuid + 破缓存参数
+function loadCaptcha() {
+  captchaKey.value = crypto.randomUUID()
+  captchaCode.value = ''
+  captchaError.value = false
+  captchaUrl.value = `${API_BASE}/captcha/get?tempKey=${captchaKey.value}&_=${Date.now()}`
+}
+
+function onCaptchaError() {
+  captchaUrl.value = ''
+  captchaError.value = true
+}
+
+loadCaptcha()
 
 // 实时格式校验：账号须为手机号或邮箱（与 AuthServiceImpl 规则一致）
 const errors = reactive<Record<string, string>>({ username: '', password: '', code: '' })
@@ -76,6 +98,7 @@ async function submit() {
   ;(['username', 'password', 'code'] as const).forEach(validateField)
   const firstError = Object.values(errors).find(Boolean)
   if (firstError) return toast.error(firstError)
+  if (!captchaCode.value) return toast.error('请输入图形验证码')
   loading.value = true
   try {
     await auth.login({
@@ -84,12 +107,15 @@ async function submit() {
       code: form.code,
       loginWay: way.value,
       isRemember: remember.value,
+      captchaCode: captchaCode.value,
+      captchaKey: captchaKey.value,
     })
     toast.success('登录成功')
     await notif.refreshUnread()
     router.push((route.query.redirect as string) || '/chat')
   } catch {
-    /* 拦截器已提示 */
+    /* 每次登录尝试都会消耗人机验证码，失败后自动换一张新图 */
+    loadCaptcha()
   } finally {
     loading.value = false
   }
@@ -184,6 +210,42 @@ async function submit() {
               </button>
             </div>
             <p v-if="errors.code" class="field-error">{{ errors.code }}</p>
+          </div>
+
+          <div>
+            <label class="label">图形验证码</label>
+            <div class="flex gap-2">
+              <input
+                v-model="captchaCode"
+                class="input flex-1"
+                placeholder="请输入右侧 4 位验证码"
+                autocomplete="off"
+                autocapitalize="off"
+                spellcheck="false"
+              />
+              <button
+                type="button"
+                class="shrink-0 overflow-hidden rounded-sm border border-line bg-surface-muted"
+                title="看不清？点击刷新"
+                aria-label="刷新图形验证码"
+                @click="loadCaptcha"
+              >
+                <img
+                  v-if="captchaUrl"
+                  :src="captchaUrl"
+                  alt="图形验证码"
+                  class="h-[38px] w-28 object-cover"
+                  draggable="false"
+                  @error="onCaptchaError"
+                />
+                <span
+                  v-else
+                  class="flex h-[38px] w-28 items-center justify-center px-1 text-center text-xs text-faint"
+                >
+                  {{ captchaError ? '加载失败，点此重试' : '加载中…' }}
+                </span>
+              </button>
+            </div>
           </div>
 
           <label class="flex items-center gap-2 text-sm text-muted">
