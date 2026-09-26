@@ -1,6 +1,6 @@
 # Aura · Agent Workbench
 
-> 🫧 **Pure Talk** — an all-in-one AI agent workbench built on LLM and multi-agent technology.
+> 🫧 An all-in-one AI agent workbench built on LLM and multi-agent technology.
 > Supports agent creation, knowledge-base Q&A, multi-turn streaming chat, long-term memory, web search, AI avatar generation, team collaboration, and admin management.
 > Powered by **ThinkUnderStar**.
 
