@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.reactive.function.client.WebClient;
 import thinkunderstar.aura.aurabackendserver.common.Result;
 import thinkunderstar.aura.aurabackendserver.dto.request.KbIds;
 import thinkunderstar.aura.aurabackendserver.dto.response.BindingKbInformationVODto;
@@ -39,8 +40,9 @@ public class SysAgentServiceImpl implements SysAgentService {
     private final AgentKbBindingMapper agentKbBindingMapper;
     private final AgentKbBindingServiceImpl agentKbBindingService;
     private final WorkspaceMapper workspaceMapper;
+    private final WebClient webClient;
 
-    public SysAgentServiceImpl(RedisTokenBucketLimiter redisTokenBucketLimiter, AgentService agentService, AgentMapper agentMapper, KnowledgeBaseMapper knowledgeBaseMapper, AgentKbBindingMapper agentKbBindingMapper, AgentKbBindingServiceImpl agentKbBindingService, WorkspaceMapper workspaceMapper) {
+    public SysAgentServiceImpl(RedisTokenBucketLimiter redisTokenBucketLimiter, AgentService agentService, AgentMapper agentMapper, KnowledgeBaseMapper knowledgeBaseMapper, AgentKbBindingMapper agentKbBindingMapper, AgentKbBindingServiceImpl agentKbBindingService, WorkspaceMapper workspaceMapper, WebClient webClient) {
         this.redisTokenBucketLimiter = redisTokenBucketLimiter;
         this.agentService = agentService;
         this.agentMapper = agentMapper;
@@ -48,6 +50,7 @@ public class SysAgentServiceImpl implements SysAgentService {
         this.agentKbBindingMapper = agentKbBindingMapper;
         this.agentKbBindingService = agentKbBindingService;
         this.workspaceMapper = workspaceMapper;
+        this.webClient = webClient;
     }
 
     @Override
@@ -338,8 +341,18 @@ public class SysAgentServiceImpl implements SysAgentService {
         // 物理删除agent
         agentService.removeById(id);
 
-        // TODO: 调用python接口删除PostgreSQL中的agent记忆
-        log.warn("python端删除agent记忆的接口未完成，agentId: {}", id);
+        //调用python端接口，删除该agent在PostgreSQL中的会话状态，和Milvus中的会话记忆集合
+        Result result = webClient.delete()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/api/v1/chat/clear/{agent_id}")
+                        .build(id)
+                ).retrieve()
+                .bodyToMono(Result.class)
+                .block();
+
+        if (result == null || result.getCode() != 200) {
+            throw new BusinessException("删除该agent的记忆失败");
+        }
 
         return Result.success();
     }
