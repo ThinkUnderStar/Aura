@@ -21,7 +21,7 @@ reranker = CrossEncoderReranker(
 extractor = LLMChainExtractor.from_llm(llm=extractor_llm)
 
 # 构建压缩管道
-pipline = DocumentCompressorPipeline(
+pipeline = DocumentCompressorPipeline(
     transformers=[
         reranker,  # 按相关性从大到小精排序
         extractor  # 摘要
@@ -66,7 +66,7 @@ async def rag_ask(question: str, collection_name: str) -> List[Document]:
     #构建完整的检索器
     retriever = ContextualCompressionRetriever(
         base_retriever=multi_query_retriever,
-        base_compressor=pipline
+        base_compressor=pipeline
     )
 
     logging.info(f"rag_ask 开始检索 {collection_name}")
