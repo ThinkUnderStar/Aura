@@ -14,7 +14,8 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173,
+    // 5173–5272 被 Windows（Hyper-V/WSL 动态保留）排除，避开该段改用 5280
+    port: 5280,
     proxy: {
       '/aura': {
         target: 'http://localhost:8001',
