@@ -1,5 +1,68 @@
-# WorkBuddy 工作区数据（AI 记忆、日志等），仅本机保留，不入库
+# ============================================
+# Aura 统一忽略规则（根目录单份）
+# 覆盖：前端(Vite/Vue) + 后端(Java/Maven) + AI(Python) + 项目级
+# ============================================
+
+# ---------- WorkBuddy 工作区数据（仅本机保留，不入库） ----------
 .workbuddy/
 
-# 运行日志
+# ---------- 运行日志 ----------
 logs/
+*.log
+
+# ---------- 前端 (Aura-frontend / Vite / Node) ----------
+node_modules/
+dist/
+dist-ssr/
+*.local
+.env.local
+.env.*.local
+
+# ---------- Java 后端 (Aura-backend-server / Maven) ----------
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+
+# 本地配置（含数据库密码等敏感信息，仅本机保留）
+**/src/main/resources/application.yaml
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/nbdist/
+/.nb-gradle/
+build/
+
+# ---------- Python AI 服务 (Aura-backend-ai) ----------
+__pycache__/
+*.pyc
+.venv/
+
+# 环境变量文件（保留模板示例）
+.env
+!.env.example
+
+# ---------- IDE / 编辑器 ----------
+### IntelliJ IDEA ###
+.idea/
+*.iws
+*.iml
+*.ipr
+
+### VS Code ###
+.vscode/*
+!.vscode/extensions.json
+
+# ---------- 系统文件 ----------
+.DS_Store
+Thumbs.db
+desktop.ini
