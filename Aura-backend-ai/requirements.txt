@@ -56,3 +56,12 @@ langmem==0.0.30
 pypdf>=5.0.0
 docx2txt>=0.8
 unstructured>=0.15.0
+
+# 文档解析：PyMuPDF 用于提取 PDF 文本层，并为 OCR 渲染页面图片
+# （pypdf 只作兜底，对拼版/增量保存等结构异常 PDF 容错较弱）
+pymupdf>=1.24.0
+
+# 扫描件 OCR：RapidOCR + onnxruntime 走 CPU 推理，不占显存
+# 仅在 PDF 无文本层时懒加载，正常文档零开销；缺任一包时退化为可读提示
+rapidocr>=3.0.0
+onnxruntime>=1.17.0
